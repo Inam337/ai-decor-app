@@ -31,10 +31,18 @@ interface AnalysisResult {
 export default function UploadPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [location, setLocation] = useState('');
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [textDescription, setTextDescription] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const { user } = useAuth();
 
@@ -56,7 +64,17 @@ export default function UploadPage() {
         // Simulate upload progress
         await new Promise(resolve => setTimeout(resolve, 1000));
         setUploadedFiles(prev => [...prev, ...files]);
-        setCurrentStep(3); // Move to analysis step
+        
+        // Set image preview for the first file
+        if (files[0]) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setImagePreview(e.target?.result as string);
+          };
+          reader.readAsDataURL(files[0]);
+        }
+        
+        setCurrentStep(2); // Move to describe/voice step
       } catch (error) {
         console.error('Upload failed:', error);
       } finally {
@@ -70,7 +88,17 @@ export default function UploadPage() {
     const files = Array.from(event.dataTransfer.files);
     if (files.length > 0) {
       setUploadedFiles(files);
-      setCurrentStep(3); // Move to analysis step
+      
+      // Set image preview for the first file
+      if (files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(files[0]);
+      }
+      
+      setCurrentStep(2); // Move to describe/voice step
     }
   };
 
@@ -79,12 +107,202 @@ export default function UploadPage() {
   };
 
 
+  const handleOptionClick = (option: string) => {
+    setSelectedOption(option);
+    setCurrentStep(3); // Move to input step
+  };
+
+  const processTextInput = async () => {
+    if (!textDescription.trim() || uploadedFiles.length === 0) return;
+    
+    setCurrentStep(4); // Move to processing step
+    setIsProcessing(true);
+    setProcessingProgress(0);
+    
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setProcessingProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + Math.random() * 15;
+        });
+      }, 300);
+
+      // Simulate image analysis
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      clearInterval(progressInterval);
+      setProcessingProgress(100);
+      
+      // Mock analysis result with color palette and object detection
+      const mockAnalysisResult = {
+        style: 'Modern Minimalist',
+        confidence: 0.87,
+        colors: {
+          primary: ['#E8E2DB', '#C4A484', '#8B4513', '#F5F5DC', '#D2B48C']
+        },
+        recommendations: [
+          {
+            id: '1',
+            title: 'Modern Abstract Art',
+            price: 299,
+            size: '24x36',
+            image_url: 'https://picsum.photos/seed/art1/300/200',
+            style_tags: ['Modern', 'Abstract', 'Contemporary']
+          }
+        ]
+      };
+      
+      setAnalysisResult(mockAnalysisResult);
+      setCurrentStep(5); // Move to results step
+      
+    } catch (error) {
+      console.error('Analysis failed:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        try {
+          const audioBlob = new Blob(audioChunksRef.current, { 
+            type: 'audio/webm;codecs=opus' 
+          });
+          
+          if (audioBlob.size > 0) {
+            await processVoiceInput(audioBlob);
+          } else {
+            console.error('No audio data recorded');
+            setIsProcessing(false);
+            setCurrentStep(3);
+          }
+        } catch (error) {
+          console.error('Error processing audio:', error);
+          setIsProcessing(false);
+          setCurrentStep(3);
+        } finally {
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        setIsRecording(false);
+        setIsProcessing(false);
+      };
+
+      mediaRecorder.start(1000);
+      setIsRecording(true);
+      
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Unable to access microphone. Please check your permissions and try again.');
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      try {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+        setIsRecording(false);
+      }
+    }
+  };
+
+  const processVoiceInput = async (audioBlob: Blob) => {
+    if (uploadedFiles.length === 0) return;
+    
+    setCurrentStep(4); // Move to processing step
+    setIsProcessing(true);
+    setProcessingProgress(0);
+    
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        
+        const progressInterval = setInterval(() => {
+          setProcessingProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return prev;
+            }
+            return prev + Math.random() * 15;
+          });
+        }, 300);
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        clearInterval(progressInterval);
+        setProcessingProgress(100);
+        
+        const mockAnalysisResult = {
+          style: 'Contemporary Vibrant',
+          confidence: 0.92,
+          colors: {
+            primary: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+          },
+          recommendations: [
+            {
+              id: '2',
+              title: 'Vibrant Contemporary Art',
+              price: 399,
+              size: '30x40',
+              image_url: 'https://picsum.photos/seed/art2/300/200',
+              style_tags: ['Contemporary', 'Vibrant', 'Bold']
+            }
+          ]
+        };
+        
+        setAnalysisResult(mockAnalysisResult);
+        setCurrentStep(5); // Move to results step
+      };
+      
+      reader.readAsDataURL(audioBlob);
+      
+    } catch (error) {
+      console.error('Voice processing failed:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleAnalyze = async (file: File) => {
     await analyzeRoom(file, location || undefined);
   };
 
   const nextStep = () => {
-    if (currentStep < 4) {
+    if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -98,6 +316,9 @@ export default function UploadPage() {
   const resetFlow = () => {
     setCurrentStep(1);
     setUploadedFiles([]);
+    setImagePreview(null);
+    setSelectedOption(null);
+    setTextDescription('');
     setAnalysisResult(null);
     setLocation('');
   };
@@ -108,10 +329,10 @@ export default function UploadPage() {
         <main className="max-w-4xl mx-auto px-4 py-8 pt-20">
           {/* Progress Steps */}
           <div className="mb-8">
-            <div className="flex items-center justify-center space-x-4">
-              {[1, 2, 3, 4].map((step) => (
+            <div className="flex items-center justify-center space-x-2">
+              {[1, 2, 3, 4, 5].map((step) => (
                 <div key={step} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs transition-all ${
                     step === currentStep 
                       ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg' 
                       : step < currentStep 
@@ -120,8 +341,8 @@ export default function UploadPage() {
                   }`}>
                     {step < currentStep ? '✓' : step}
                   </div>
-                  {step < 4 && (
-                    <div className={`w-16 h-1 mx-2 rounded ${
+                  {step < 5 && (
+                    <div className={`w-12 h-1 mx-1 rounded ${
                       step < currentStep 
                         ? 'bg-gradient-to-r from-green-500 to-green-600' 
                         : 'bg-gray-200'
@@ -133,15 +354,17 @@ export default function UploadPage() {
             <div className="text-center mt-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 {currentStep === 1 && 'Step 1: Location'}
-                {currentStep === 2 && 'Step 2: Upload Photo'}
-                {currentStep === 3 && 'Step 3: AI Analysis'}
-                {currentStep === 4 && 'Step 4: Results'}
+                {currentStep === 2 && 'Step 2: Choose Input Method'}
+                {currentStep === 3 && (selectedOption === 'text' ? 'Step 3: Describe Your Style' : 'Step 3: Voice Recording')}
+                {currentStep === 4 && 'Step 4: AI Analysis'}
+                {currentStep === 5 && 'Step 5: Results'}
               </h2>
               <p className="text-gray-600">
                 {currentStep === 1 && 'Help us find nearby stores and local trends'}
-                {currentStep === 2 && 'Upload your room photo for AI analysis'}
-                {currentStep === 3 && 'Our AI is analyzing your room'}
-                {currentStep === 4 && 'Your personalized recommendations are ready'}
+                {currentStep === 2 && 'Choose how you want to describe your preferences'}
+                {currentStep === 3 && (selectedOption === 'text' ? 'Tell us about your style preferences in detail' : 'Record your design ideas naturally')}
+                {currentStep === 4 && 'Our AI is analyzing your image and preferences'}
+                {currentStep === 5 && 'Your personalized analysis and recommendations are ready'}
               </p>
             </div>
           </div>
@@ -182,93 +405,161 @@ export default function UploadPage() {
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g., New York, NY"
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
-                  />
-                  <button
+                        />
+                        <button
                     onClick={nextStep}
                     className="w-full mt-6 bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl"
-                  >
+                        >
                     Continue
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+            {/* Step 2: Choose Input Method */}
+            {currentStep === 2 && (
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">Choose Your Input Method</h3>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                  Now tell us about your design preferences
+                </p>
+                
+                {/* Show uploaded image preview */}
+                {imagePreview && (
+                  <div className="mb-8">
+                    <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden shadow-lg">
+                      <img src={imagePreview} alt="Uploaded space" className="w-full h-full object-cover" />
+                          </div>
+                    <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                  {/* Text Input Option */}
+                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleOptionClick('text')}>
+                    <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">Describe Style</h4>
+                    <p className="text-gray-600 text-sm">Tell us your design preferences in writing</p>
+                  </div>
+
+                  {/* Voice Input Option */}
+                  <div className="bg-gradient-to-br from-pink-50 to-red-50 rounded-2xl p-6 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleOptionClick('voice')}>
+                    <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">Voice Query</h4>
+                    <p className="text-gray-600 text-sm">Speak your design ideas naturally</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Text Input */}
+            {currentStep === 3 && selectedOption === 'text' && (
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">Describe Your Style</h3>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                  Tell us about your design preferences in detail
+                </p>
+                
+                {/* Show uploaded image preview */}
+                {imagePreview && (
+                  <div className="mb-8">
+                    <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden shadow-lg">
+                      <img src={imagePreview} alt="Uploaded space" className="w-full h-full object-cover" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
+                  </div>
+                )}
+                
+                <div className="max-w-2xl mx-auto">
+                  <textarea
+                    value={textDescription}
+                    onChange={(e) => setTextDescription(e.target.value)}
+                    placeholder="Tell us about your style preferences... e.g., 'I love modern minimalist design with clean lines and neutral colors. I want something that complements my white walls and wooden furniture.'"
+                    className="w-full h-32 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg resize-none"
+                  />
+                  <div className="flex justify-between items-center mt-4">
+                    <p className="text-sm text-gray-500">
+                      {textDescription.length}/500 characters
+                    </p>
+                    <button
+                      onClick={processTextInput}
+                      disabled={!textDescription.trim()}
+                      className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Start Analysis
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Voice Recording */}
+            {currentStep === 3 && selectedOption === 'voice' && (
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gradient-to-r from-pink-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">Voice Recording</h3>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                  Click to start recording your design preferences
+                </p>
+                
+                {/* Show uploaded image preview */}
+                {imagePreview && (
+                  <div className="mb-8">
+                    <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden shadow-lg">
+                      <img src={imagePreview} alt="Uploaded space" className="w-full h-full object-cover" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
+                  </div>
+                )}
+                
+                <div className="max-w-md mx-auto">
+                  <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-6 ${
+                    isRecording ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-red-500'
+                  }`}>
+                    <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  </div>
+                 
+                  <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isProcessing}
+                    className={`px-8 py-4 rounded-2xl font-semibold text-lg transition-all ${
+                      isRecording 
+                        ? 'bg-red-500 hover:bg-red-600 text-white' 
+                        : 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90 text-white'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {isRecording ? 'Stop Recording' : 'Start Recording'}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Upload */}
-            {currentStep === 2 && (
-              <div className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload Room Photo</h3>
-                <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                  Drop your room photo here or click to browse files
-                </p>
-                
-                <div
-                  className={`border-3 border-dashed rounded-3xl p-12 text-center transition-all duration-300 mx-auto max-w-lg ${
-                    isUploading 
-                      ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-purple-50' 
-                      : 'border-gray-300 hover:border-purple-400 hover:bg-gradient-to-br hover:from-purple-50 hover:to-blue-50'
-                    }`}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                >
-                  {isUploading ? (
-                    <div className="space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                      <p className="text-gray-600 font-medium text-lg">Uploading...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto">
-                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 font-medium text-lg mb-2">Drop your room photo here</p>
-                        <p className="text-gray-500 mb-6">or click to browse</p>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl"
-                        >
-                          Choose Files
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Navigation */}
-                <div className="flex justify-center mt-8">
-                          <button
-                    onClick={nextStep}
-                    disabled={uploadedFiles.length === 0}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                          </button>
-                        </div>
-              </div>
-            )}
-
-            {/* Step 3: Analysis */}
-            {currentStep === 3 && (
+            {/* Step 4: Analysis */}
+            {currentStep === 4 && (
               <div className="text-center">
                 <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,49 +567,37 @@ export default function UploadPage() {
                   </svg>
             </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis in Progress</h3>
-                <p className="text-gray-600 mb-8">Our AI is analyzing your room to find perfect artwork matches</p>
+                <p className="text-gray-600 mb-8">Our AI is analyzing your image and preferences</p>
                 
                 <div className="max-w-md mx-auto">
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-600 font-medium">Progress</span>
-                      <span className="text-purple-600 font-bold text-lg">{Math.round(analysisProgress)}%</span>
+                      <span className="text-purple-600 font-bold text-lg">{Math.round(processingProgress)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-4">
                       <div
                         className="bg-gradient-to-r from-purple-500 to-blue-500 h-4 rounded-full transition-all duration-500"
-                        style={{ width: `${analysisProgress}%` }}
+                        style={{ width: `${processingProgress}%` }}
                       ></div>
                     </div>
                   </div>
                   
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6">
                     <p className="text-gray-700 font-medium">
-                      {analysisProgress < 25 && "Processing image..."}
-                      {analysisProgress >= 25 && analysisProgress < 50 && "Detecting room features..."}
-                      {analysisProgress >= 50 && analysisProgress < 75 && "Finding matching artwork..."}
-                      {analysisProgress >= 75 && analysisProgress < 95 && "Generating recommendations..."}
-                      {analysisProgress >= 95 && analysisProgress < 100 && "Finalizing analysis..."}
-                      {analysisProgress === 100 && "Analysis complete!"}
+                      {processingProgress < 25 && "Processing image..."}
+                      {processingProgress >= 25 && processingProgress < 50 && "Detecting objects..."}
+                      {processingProgress >= 50 && processingProgress < 75 && "Analyzing color palette..."}
+                      {processingProgress >= 75 && processingProgress < 100 && "Generating recommendations..."}
+                      {processingProgress === 100 && "Analysis complete!"}
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Navigation */}
-                <div className="flex justify-center mt-8">
-                  <button
-                    onClick={() => handleAnalyze(uploadedFiles[0])}
-                    disabled={isAnalyzing}
-                    className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-600 hover:to-blue-600 transition-all disabled:opacity-50"
-                  >
-                    {isAnalyzing ? 'Analyzing...' : 'Start Analysis'}
-                  </button>
-                  </div>
-                </div>
-              )}
-
-            {/* Step 4: Results */}
-            {currentStep === 4 && analysisResult && (
+            {/* Step 5: Results */}
+            {currentStep === 5 && analysisResult && (
               <div className="text-center">
                 <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,72 +605,98 @@ export default function UploadPage() {
                   </svg>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">Analysis Complete!</h3>
-                <p className="text-gray-600 mb-8">Your personalized recommendations are ready</p>
+                <p className="text-gray-600 mb-8">Your personalized analysis and recommendations are ready</p>
 
-                <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Room Style */}
-                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600">Detected Style</p>
-                        <p className="font-bold text-gray-900 text-lg capitalize">{analysisResult.style}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Confidence</p>
-                        <p className="font-bold text-green-600 text-lg">{(analysisResult.confidence * 100).toFixed(0)}%</p>
-                      </div>
-                      </div>
-                    </div>
-
+                <div className="max-w-4xl mx-auto space-y-8">
+                  {/* Image Analysis Results */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Color Palette */}
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6">
-                    <h4 className="font-bold text-gray-900 mb-4">Color Palette</h4>
-                    <div className="space-y-4">
-                        {/* Primary Colors */}
-                        <div>
-                        <p className="text-sm text-gray-600 mb-2">Primary Colors</p>
-                        <div className="flex justify-center space-x-3">
-                            {analysisResult.colors.primary.map((color: string, index: number) => (
-                              <div
-                                key={index}
-                              className="w-12 h-12 rounded-xl border-2 border-white shadow-lg"
-                                  style={{ backgroundColor: color }}
-                                  title={color}
-                                ></div>
-                              ))}
-                            </div>
+                    <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
+                      <h4 className="text-xl font-bold text-gray-900 mb-4">Color Palette</h4>
+                      <div className="flex justify-center space-x-3 mb-4">
+                        {analysisResult.colors.primary.map((color: string, index: number) => (
+                          <div
+                            key={index}
+                            className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg"
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          ></div>
+                        ))}
                       </div>
-                      </div>
+                      <p className="text-sm text-gray-600">Detected from your space</p>
                     </div>
 
-                    {/* Action Buttons */}
-                  <div className="space-y-4">
-                      <Link
-                        href="/recommendations"
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl block"
-                      >
-                        View Recommendations
-                      </Link>
-                      <Link
-                        href="/chat"
-                      className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white py-3 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all block"
-                      >
-                        Chat with AI
-                      </Link>
+                    {/* Style Analysis */}
+                    <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
+                      <h4 className="text-xl font-bold text-gray-900 mb-4">Style Analysis</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-gray-600 mb-2">Detected Style</p>
+                          <p className="font-bold text-gray-900 text-lg capitalize">{analysisResult.style}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 mb-2">Confidence</p>
+                          <p className="font-bold text-green-600 text-lg">{(analysisResult.confidence * 100).toFixed(0)}%</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                {/* Navigation */}
-                <div className="flex justify-center mt-8">
-                  <button
-                    onClick={resetFlow}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all"
-                  >
-                    Start Over
-                  </button>
+                  {/* Recommendations */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {analysisResult.recommendations.map((rec) => (
+                      <div key={rec.id} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 hover:shadow-lg transition-all">
+                        <img 
+                          src={rec.image_url} 
+                          alt={rec.title}
+                          className="w-full h-48 object-cover rounded-lg mb-4"
+                        />
+                        <h4 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h4>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {rec.style_tags?.map((tag: string, index: number) => (
+                            <span key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xl font-bold text-gray-900">${rec.price}</span>
+                          <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-4">
+                    <Link
+                      href="/recommendations"
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl block"
+                    >
+                      View All Recommendations
+                    </Link>
+                    <Link
+                      href="/chat"
+                      className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white py-3 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all block"
+                    >
+                      Chat with AI
+                    </Link>
+                  </div>
+
+                  {/* Navigation */}
+                  <div className="flex justify-center mt-8">
+                    <button
+                      onClick={resetFlow}
+                      className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all"
+                    >
+                      Start Over
+                    </button>
+                  </div>
                 </div>
-                </div>
-              )}
+              </div>
+            )}
           </div>
         </main>
         <Footer />
