@@ -1,5 +1,5 @@
 fastapi==0.104.1
-uvicorn==0.24.0
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pydantic==2.4.2
 supabase==2.3.0
@@ -15,8 +15,21 @@ faiss-cpu==1.7.4
 openai==1.3.5
 requests==2.31.0
 python-dotenv==1.0.0
+aiohttp==3.9.1
+beautifulsoup4==4.12.2
+lxml==4.9.3
+redis==5.0.1
+aioredis==2.0.1
 httpx>=0.24.0,<0.25.0
 googlemaps==4.10.0
 tavily-python==0.3.0
 groq==0.4.1
 whisper==1.1.10
+# Additional dependencies for Vision-Match Agent
+matplotlib==3.7.2
+seaborn==0.12.2
+# Additional dependencies
+chromadb
+sentence-transformers
+tqdm
+

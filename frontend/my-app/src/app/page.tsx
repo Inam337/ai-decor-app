@@ -8,6 +8,7 @@ import ImageUpload from '@/components/analysis/ImageUpload';
 import StyleInput from '@/components/analysis/StyleInput';
 import ProcessingStep from '@/components/analysis/ProcessingStep';
 import AnalysisResults from '@/components/analysis/AnalysisResults';
+import { RoomAnalysisResult } from '@/types';
 import BackButton from '@/components/analysis/BackButton';
 import ContextIndicator from '@/components/analysis/ContextIndicator';
 
@@ -21,20 +22,7 @@ export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [analysisResult, setAnalysisResult] = useState<{
-    colorPalette: string[];
-    detectedObjects: string[];
-    style: string;
-    confidence: number;
-  } | null>(null);
-  const [recommendations, setRecommendations] = useState<Array<{
-    id: string;
-    title: string;
-    price: number;
-    image_url: string;
-    style_tags: string[];
-    description: string;
-  }>>([]);
+  const [analysisResult, setAnalysisResult] = useState<RoomAnalysisResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [contextUsed, setContextUsed] = useState(false);
   const [contextSummary, setContextSummary] = useState<string | null>(null);
@@ -86,7 +74,6 @@ export default function Home() {
     setSelectedOption(null);
     setTextDescription('');
     setAnalysisResult(null);
-    setRecommendations([]);
     setShowResults(false);
     setContextUsed(false);
     setContextSummary(null);
@@ -127,12 +114,84 @@ export default function Home() {
       clearInterval(progressInterval);
       setProcessingProgress(100);
       
-      // Mock analysis result with color palette and object detection
-      const mockAnalysisResult = {
-        colorPalette: ['#E8E2DB', '#C4A484', '#8B4513', '#F5F5DC', '#D2B48C'],
-        detectedObjects: ['Sofa', 'Coffee Table', 'Window', 'Plant', 'Lamp'],
-        style: 'Modern Minimalist',
-        confidence: 0.87
+      // Mock analysis result with new API structure
+      const mockAnalysisResult: RoomAnalysisResult = {
+        success: true,
+        room_analysis: {
+          detections: {
+            walls: [
+              { type: "wall", color: "#E8E2DB", area: 15.5 },
+              { type: "wall", color: "#C4A484", area: 12.3 }
+            ],
+            windows: [
+              { type: "window", area: 2.1, position: "north" },
+              { type: "window", area: 1.8, position: "south" }
+            ],
+            furniture: [
+              { name: "sofa", type: "furniture", color: "#8B4513" },
+              { name: "coffee_table", type: "furniture", color: "#654321" },
+              { name: "bookshelf", type: "furniture", color: "#2F4F4F" }
+            ],
+            other: [
+              { name: "lamp", type: "lighting", color: "#FFD700" },
+              { name: "plant", type: "decoration", color: "#228B22" }
+            ]
+          },
+          color_palette: [
+            { rgb: [232, 226, 219], hex: "#E8E2DB", percentage: 35.2 },
+            { rgb: [196, 164, 132], hex: "#C4A484", percentage: 25.8 },
+            { rgb: [139, 69, 19], hex: "#8B4513", percentage: 20.1 },
+            { rgb: [245, 245, 220], hex: "#F5F5DC", percentage: 12.5 },
+            { rgb: [210, 180, 140], hex: "#D2B48C", percentage: 6.4 }
+          ],
+          lighting: {
+            mean_brightness: 125.5,
+            lighting_condition: "moderate"
+          },
+          aesthetic_style: {
+            style: "Modern Minimalist",
+            confidence: 0.87
+          }
+        },
+        recommendations: [
+          {
+            artwork_id: "art_001",
+            title: "Modern Abstract Art",
+            match_score: 0.95,
+            reasoning: "Perfect match for your modern minimalist style; Complements your neutral color palette",
+            artist: "Jane Smith",
+            price: 299,
+            image_url: "https://picsum.photos/seed/art1/300/200",
+            style: "modern"
+          },
+          {
+            artwork_id: "art_002",
+            title: "Minimalist Lines",
+            match_score: 0.89,
+            reasoning: "Clean lines complement your modern aesthetic; Neutral colors blend seamlessly",
+            artist: "John Doe",
+            price: 250,
+            image_url: "https://picsum.photos/seed/art2/300/200",
+            style: "minimalist"
+          }
+        ],
+        trend_insights: {
+          evolution_insights: "Your modern minimalist style is trending. Consider incorporating warm earth tones and natural textures.",
+          trending_complements: ["warm minimalism", "biophilic design", "curved furniture"],
+          trending_styles: ["modern minimalist", "warm minimalism", "biophilic design"],
+          popular_colors: ["warm neutrals", "earth tones", "sage green"],
+          emerging_trends: ["sustainable materials", "curved furniture", "mixed textures"],
+          seasonal_adaptations: {
+            season: "winter",
+            suggestions: ["warm textiles", "cozy lighting", "rich colors"]
+          },
+          analysis_timestamp: new Date().toISOString()
+        },
+        location_suggestions: {
+          nearby_stores: []
+        },
+        final_reasoning: "Your room has a modern minimalist aesthetic with 87% confidence. The dominant colors are warm neutrals. Your space has moderate lighting conditions. Our top recommendation perfectly complements your style.",
+        session_id: "session_demo"
       };
       
       setAnalysisResult(mockAnalysisResult);
@@ -144,35 +203,6 @@ export default function Home() {
         setContextSummary("Your last text query was: 'modern living room decor' | Search context from December 15, 2024 at 2:30 PM | Previous style preferences: modern, minimalist");
       }
       
-      // Mock recommendations based on analysis
-      const mockRecommendations = [
-        {
-          id: '1',
-          title: 'Modern Abstract Art',
-          price: 299,
-          image_url: 'https://picsum.photos/seed/art1/300/200',
-          style_tags: ['Modern', 'Abstract', 'Contemporary'],
-          description: 'Perfect match for your modern minimalist style'
-        },
-        {
-          id: '2', 
-          title: 'Geometric Wall Art',
-          price: 199,
-          image_url: 'https://picsum.photos/seed/art2/300/200',
-          style_tags: ['Geometric', 'Modern', 'Clean'],
-          description: 'Complements your clean aesthetic preferences'
-        },
-        {
-          id: '3',
-          title: 'Minimalist Canvas',
-          price: 149,
-          image_url: 'https://picsum.photos/seed/art3/300/200',
-          style_tags: ['Minimalist', 'Simple', 'Elegant'],
-          description: 'Matches your preference for simplicity'
-        }
-      ];
-      
-      setRecommendations(mockRecommendations);
       setShowResults(true);
       setCurrentStep(4); // Move to results step
       
@@ -290,12 +320,94 @@ export default function Home() {
         clearInterval(progressInterval);
         setProcessingProgress(100);
         
-        // Mock analysis result with color palette and object detection
-        const mockAnalysisResult = {
-          colorPalette: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
-          detectedObjects: ['Sofa', 'Coffee Table', 'Window', 'Plant', 'Lamp'],
-          style: 'Contemporary Vibrant',
-          confidence: 0.92
+        // Mock analysis result with new API structure
+        const mockAnalysisResult: RoomAnalysisResult = {
+          success: true,
+          room_analysis: {
+            detections: {
+              walls: [
+                { type: "wall", color: "#FF6B6B", area: 18.2 },
+                { type: "wall", color: "#4ECDC4", area: 14.7 }
+              ],
+              windows: [
+                { type: "window", area: 3.2, position: "east" },
+                { type: "window", area: 2.8, position: "west" }
+              ],
+              furniture: [
+                { name: "vibrant_sofa", type: "furniture", color: "#45B7D1" },
+                { name: "colorful_chair", type: "furniture", color: "#96CEB4" },
+                { name: "modern_table", type: "furniture", color: "#FFEAA7" }
+              ],
+              other: [
+                { name: "artwork", type: "decoration", color: "#FF6B6B" },
+                { name: "pillow", type: "textile", color: "#4ECDC4" }
+              ]
+            },
+            color_palette: [
+              { rgb: [255, 107, 107], hex: "#FF6B6B", percentage: 30.5 },
+              { rgb: [78, 205, 196], hex: "#4ECDC4", percentage: 25.2 },
+              { rgb: [69, 183, 209], hex: "#45B7D1", percentage: 20.8 },
+              { rgb: [150, 206, 180], hex: "#96CEB4", percentage: 15.3 },
+              { rgb: [255, 234, 167], hex: "#FFEAA7", percentage: 8.2 }
+            ],
+            lighting: {
+              mean_brightness: 145.8,
+              lighting_condition: "bright"
+            },
+            aesthetic_style: {
+              style: "Contemporary Vibrant",
+              confidence: 0.92
+            }
+          },
+          recommendations: [
+            {
+              artwork_id: "art_004",
+              title: "Vibrant Contemporary Art",
+              match_score: 0.92,
+              reasoning: "Perfect match for your contemporary vibrant style; Bold colors complement your space",
+              artist: "John Doe",
+              price: 399,
+              image_url: "https://picsum.photos/seed/art4/300/200",
+              style: "contemporary"
+            },
+            {
+              artwork_id: "art_005",
+              title: "Nature-Inspired Canvas",
+              match_score: 0.88,
+              reasoning: "Matches your preference for natural elements; Organic shapes complement vibrant colors",
+              artist: "Sarah Wilson",
+              price: 249,
+              image_url: "https://picsum.photos/seed/art5/300/200",
+              style: "nature"
+            },
+            {
+              artwork_id: "art_006",
+              title: "Statement Wall Piece",
+              match_score: 0.85,
+              reasoning: "Perfect centerpiece for your space; Dramatic design matches your bold aesthetic",
+              artist: "Mike Johnson",
+              price: 499,
+              image_url: "https://picsum.photos/seed/art6/300/200",
+              style: "statement"
+            }
+          ],
+          trend_insights: {
+            evolution_insights: "Your contemporary vibrant style is very current. Bold colors and dynamic patterns are trending.",
+            trending_complements: ["bold patterns", "mixed textures", "dynamic lighting"],
+            trending_styles: ["contemporary vibrant", "bold contemporary", "dynamic modern"],
+            popular_colors: ["bold reds", "vibrant blues", "energetic yellows"],
+            emerging_trends: ["dynamic patterns", "mixed textures", "bold accents"],
+            seasonal_adaptations: {
+              season: "winter",
+              suggestions: ["warm textiles", "cozy lighting", "rich colors"]
+            },
+            analysis_timestamp: new Date().toISOString()
+          },
+          location_suggestions: {
+            nearby_stores: []
+          },
+          final_reasoning: "Your room has a contemporary vibrant aesthetic with 92% confidence. The bold color palette creates an energetic atmosphere. Your space has bright lighting conditions. Our recommendation perfectly matches your vibrant style.",
+          session_id: "session_voice_demo"
         };
         
         setAnalysisResult(mockAnalysisResult);
@@ -305,36 +417,6 @@ export default function Home() {
           setContextUsed(true);
           setContextSummary("Your last voice query was: 'I need colorful artwork for my bedroom' | Search context from December 15, 2024 at 3:45 PM | Previous style preferences: contemporary, vibrant");
         }
-        
-        // Mock recommendations based on voice analysis
-        const mockRecommendations = [
-          {
-            id: '4',
-            title: 'Vibrant Contemporary Art',
-            price: 399,
-            image_url: 'https://picsum.photos/seed/art4/300/200',
-            style_tags: ['Contemporary', 'Vibrant', 'Bold'],
-            description: 'Based on your voice description of bold colors'
-          },
-          {
-            id: '5',
-            title: 'Nature-Inspired Canvas',
-            price: 249,
-            image_url: 'https://picsum.photos/seed/art5/300/200',
-            style_tags: ['Nature', 'Organic', 'Calming'],
-            description: 'Matches your preference for natural elements'
-          },
-          {
-            id: '6',
-            title: 'Statement Wall Piece',
-            price: 499,
-            image_url: 'https://picsum.photos/seed/art6/300/200',
-            style_tags: ['Statement', 'Large', 'Dramatic'],
-            description: 'Perfect centerpiece for your space'
-          }
-        ];
-        
-        setRecommendations(mockRecommendations);
         setShowResults(true);
         setCurrentStep(4); // Move to results step
       };
@@ -454,8 +536,7 @@ export default function Home() {
             {/* Step 4: Results */}
             {currentStep === 4 && showResults && analysisResult && (
               <AnalysisResults
-                analysisResult={analysisResult}
-                recommendations={recommendations}
+                analysisData={analysisResult}
                 onResetFlow={resetFlow}
               />
             )}
@@ -670,7 +751,7 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href="/upload-manager" className="group">
+            <Link href="/upload-manager" className="group" onClick={startDemo}>
               <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-green-300">
                 <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

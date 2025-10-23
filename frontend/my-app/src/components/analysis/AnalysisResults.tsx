@@ -1,35 +1,51 @@
 import Link from 'next/link';
-
-interface AnalysisResult {
-  colorPalette: string[];
-  detectedObjects: string[];
-  style: string;
-  confidence: number;
-  wallColors?: string[];
-  lighting?: string;
-  roomType?: string;
-}
-
-interface Recommendation {
-  id: string;
-  title: string;
-  price: number;
-  image_url: string;
-  style_tags: string[];
-  description: string;
-}
+import { RoomAnalysisResult } from '@/types';
 
 interface AnalysisResultsProps {
-  analysisResult: AnalysisResult;
-  recommendations: Recommendation[];
+  analysisData: RoomAnalysisResult | null;
   onResetFlow: () => void;
 }
 
 export default function AnalysisResults({ 
-  analysisResult, 
-  recommendations, 
+  analysisData, 
   onResetFlow 
 }: AnalysisResultsProps) {
+  // Add null check and loading state
+  if (!analysisData) {
+    return (
+      <div className="text-center">
+        <div className="w-24 h-24 bg-gradient-to-r from-gray-400 to-gray-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg className="w-12 h-12 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">Loading Analysis...</h3>
+        <p className="text-gray-600 mb-8">Please wait while we process your room analysis</p>
+      </div>
+    );
+  }
+
+  // Extract data from the new API response structure
+  const roomAnalysis = analysisData.room_analysis;
+  const recommendations = analysisData.recommendations;
+  const finalReasoning = analysisData.final_reasoning;
+  
+  // Helper function to get total detected objects
+  const getTotalDetectedObjects = () => {
+    const detections = roomAnalysis?.detections;
+    if (!detections) return 0;
+    return (detections.walls?.length || 0) + 
+           (detections.windows?.length || 0) + 
+           (detections.furniture?.length || 0) + 
+           (detections.other?.length || 0);
+  };
+
+  // Helper function to get wall colors from detections
+  const getWallColors = () => {
+    const detections = roomAnalysis?.detections;
+    if (!detections?.walls) return [];
+    return detections.walls.map((wall: { color?: string }) => wall.color || '#f0f0f0');
+  };
   return (
     <div className="text-center">
       <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -54,7 +70,7 @@ export default function AnalysisResults({
                 </svg>
               </div>
               <h4 className="text-lg font-bold text-gray-900 mb-2">Style Confidence</h4>
-              <p className="text-3xl font-bold text-green-600">{(analysisResult.confidence * 100).toFixed(0)}%</p>
+              <p className="text-3xl font-bold text-green-600">{((roomAnalysis?.aesthetic_style?.confidence || 0) * 100).toFixed(0)}%</p>
               <p className="text-sm text-gray-600 mt-2">AI Analysis Accuracy</p>
               <div className="mt-2">
                 <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">MANDATORY</span>
@@ -69,7 +85,7 @@ export default function AnalysisResults({
                 </svg>
               </div>
               <h4 className="text-lg font-bold text-gray-900 mb-2">Objects Detected</h4>
-              <p className="text-3xl font-bold text-blue-600">{analysisResult.detectedObjects.length}</p>
+              <p className="text-3xl font-bold text-blue-600">{getTotalDetectedObjects()}</p>
               <p className="text-sm text-gray-600 mt-2">Items Found</p>
               <div className="mt-2">
                 <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">MANDATORY</span>
@@ -84,7 +100,7 @@ export default function AnalysisResults({
                 </svg>
               </div>
               <h4 className="text-lg font-bold text-gray-900 mb-2">Color Palette</h4>
-              <p className="text-3xl font-bold text-pink-600">{analysisResult.colorPalette.length}</p>
+              <p className="text-3xl font-bold text-pink-600">{roomAnalysis?.color_palette?.length || 0}</p>
               <p className="text-sm text-gray-600 mt-2">Colors Identified</p>
               <div className="mt-2">
                 <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">MANDATORY</span>
@@ -103,21 +119,22 @@ export default function AnalysisResults({
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            {analysisResult.colorPalette.map((color: string, index: number) => (
+            {(roomAnalysis?.color_palette || []).map((colorData: { hex: string; percentage: number }, index: number) => (
               <div key={index} className="text-center">
                 <div
                   className="w-20 h-20 rounded-2xl border-3 border-white shadow-xl mx-auto mb-3"
-                  style={{ backgroundColor: color }}
-                  title={color}
+                  style={{ backgroundColor: colorData.hex }}
+                  title={`${colorData.hex} (${colorData.percentage.toFixed(1)}%)`}
                 ></div>
-                <p className="text-xs font-mono text-gray-600">{color}</p>
+                <p className="text-xs font-mono text-gray-600">{colorData.hex}</p>
+                <p className="text-xs text-gray-500">{colorData.percentage.toFixed(1)}%</p>
               </div>
             ))}
           </div>
           <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl p-4 text-center">
             <p className="text-sm text-gray-700">
-              <span className="font-semibold">Style:</span> {analysisResult.style} | 
-              <span className="font-semibold"> Confidence:</span> {(analysisResult.confidence * 100).toFixed(0)}%
+              <span className="font-semibold">Style:</span> {roomAnalysis?.aesthetic_style?.style || 'Unknown'} | 
+              <span className="font-semibold"> Confidence:</span> {((roomAnalysis?.aesthetic_style?.confidence || 0) * 100).toFixed(0)}%
             </p>
           </div>
         </div>
@@ -139,8 +156,8 @@ export default function AnalysisResults({
                 <p className="text-gray-700 font-medium">Wall Color</p>
               </div>
               <div className="flex items-center space-x-2">
-                {analysisResult.wallColors && analysisResult.wallColors.length > 0 ? (
-                  analysisResult.wallColors.slice(0, 2).map((color, index) => (
+                {getWallColors().length > 0 ? (
+                  getWallColors().slice(0, 2).map((color, index) => (
                     <div 
                       key={index}
                       className="w-8 h-8 rounded border-2 border-white shadow-sm"
@@ -164,7 +181,7 @@ export default function AnalysisResults({
               </div>
               <div className="text-right">
                 <span className="text-yellow-600 font-semibold">
-                  {analysisResult.lighting || 'Natural Light'}
+                  {roomAnalysis?.lighting?.lighting_condition || 'Natural Light'}
                 </span>
               </div>
             </div>
@@ -176,7 +193,7 @@ export default function AnalysisResults({
               </div>
               <div className="text-right">
                 <span className="text-blue-600 font-semibold">
-                  {analysisResult.roomType || 'Living Room'}
+                  Living Room
                 </span>
               </div>
             </div>
@@ -187,7 +204,7 @@ export default function AnalysisResults({
                 <p className="text-gray-700 font-medium">Style Detected</p>
               </div>
               <div className="text-right">
-                <span className="text-purple-600 font-semibold">{analysisResult.style}</span>
+                <span className="text-purple-600 font-semibold">{roomAnalysis?.aesthetic_style?.style || 'Unknown Style'}</span>
               </div>
             </div>
           </div>
@@ -197,9 +214,19 @@ export default function AnalysisResults({
         <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
           <h4 className="text-xl font-bold text-gray-900 mb-4 text-center">🔍 Detected Objects</h4>
           <div className="flex flex-wrap gap-3 justify-center">
-            {analysisResult.detectedObjects.map((object: string, index: number) => (
+            {(roomAnalysis?.detections?.furniture || []).map((item: { name?: string; type?: string }, index: number) => (
               <span key={index} className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 text-sm font-medium px-4 py-2 rounded-full border border-blue-200">
-                {object}
+                {item.name || item.type || 'Furniture'}
+              </span>
+            ))}
+            {(roomAnalysis?.detections?.windows || []).map((item: { name?: string; type?: string }, index: number) => (
+              <span key={`window-${index}`} className="bg-gradient-to-r from-green-100 to-teal-100 text-green-800 text-sm font-medium px-4 py-2 rounded-full border border-green-200">
+                Window
+              </span>
+            ))}
+            {(roomAnalysis?.detections?.other || []).map((item: { name?: string; type?: string }, index: number) => (
+              <span key={`other-${index}`} className="bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 text-sm font-medium px-4 py-2 rounded-full border border-gray-200">
+                {item.name || item.type || 'Other'}
               </span>
             ))}
           </div>
@@ -208,24 +235,31 @@ export default function AnalysisResults({
 
         {/* Recommendations */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map((rec) => (
-            <div key={rec.id} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 hover:shadow-lg transition-all">
-              <img 
-                src={rec.image_url} 
-                alt={rec.title}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
+          {(recommendations || []).map((rec) => (
+            <div key={rec.artwork_id} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 hover:shadow-lg transition-all">
+              {rec.image_url && (
+                <img 
+                  src={rec.image_url} 
+                  alt={rec.title}
+                  className="w-full h-48 object-cover rounded-lg mb-4"
+                />
+              )}
               <h4 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h4>
-              <p className="text-gray-600 text-sm mb-3">{rec.description}</p>
+              <p className="text-gray-600 text-sm mb-3">{rec.reasoning}</p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {rec.style_tags.map((tag: string, index: number) => (
-                  <span key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                    {tag}
+                {rec.style && (
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                    {rec.style}
                   </span>
-                ))}
+                )}
+                <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                  Match: {(rec.match_score * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xl font-bold text-gray-900">${rec.price}</span>
+                {rec.price && (
+                  <span className="text-xl font-bold text-gray-900">${rec.price}</span>
+                )}
                 <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
                   View Details
                 </button>
@@ -233,6 +267,14 @@ export default function AnalysisResults({
             </div>
           ))}
         </div>
+
+        {/* Final Reasoning */}
+        {finalReasoning && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200">
+            <h4 className="text-xl font-bold text-gray-900 mb-4 text-center">💡 AI Analysis Summary</h4>
+            <p className="text-gray-700 text-center leading-relaxed">{finalReasoning}</p>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-4">

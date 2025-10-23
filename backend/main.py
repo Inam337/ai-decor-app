@@ -13,6 +13,9 @@ from decision_router import decision_router
 from database import supabase_client
 from config import HOST, PORT, DEBUG
 from auth import get_current_user, require_auth, optional_auth
+from cache import redis_cache
+from cache_invalidation import cache_invalidation
+from search import vector_search, search_engine_search, hybrid_search
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -532,6 +535,381 @@ async def get_trending_items():
         
     except Exception as e:
         logger.error(f"Error getting trending items: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Dashboard Analytics API Endpoints
+
+@app.get("/api/dashboard/stats")
+async def get_dashboard_stats(current_user: dict = Depends(require_auth)):
+    """Get real-time dashboard statistics"""
+    try:
+        # Get real user count from database
+        users_data = await supabase_client.get_all_users()
+        total_users = len(users_data) if users_data else 0
+        
+        # Get active sessions (mock for now, would be real in production)
+        active_sessions = await supabase_client.get_active_sessions()
+        active_count = len(active_sessions) if active_sessions else 0
+        
+        # Get AI recommendations count
+        recommendations_data = await supabase_client.get_recommendations_count()
+        ai_recommendations = recommendations_data.get('count', 0) if recommendations_data else 0
+        
+        # Calculate growth percentages (mock for now)
+        stats = {
+            "total_users": {
+                "value": f"{total_users:,}",
+                "change": "+12%",
+                "trend": "up"
+            },
+            "active_sessions": {
+                "value": f"{active_count:,}",
+                "change": "+8%",
+                "trend": "up"
+            },
+            "ai_recommendations": {
+                "value": f"{ai_recommendations:,}",
+                "change": "+23%",
+                "trend": "up"
+            },
+            "revenue": {
+                "value": "$89,432",
+                "change": "+15%",
+                "trend": "up"
+            }
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/dashboard/activities")
+async def get_recent_activities(current_user: dict = Depends(require_auth)):
+    """Get recent user activities"""
+    try:
+        # Get recent activities from database
+        activities = await supabase_client.get_recent_activities(limit=10)
+        
+        if not activities:
+            # Fallback mock data
+            activities = [
+                {
+                    "id": 1,
+                    "user_email": "john.doe@gmail.com",
+                    "action": "Uploaded room photo",
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "upload"
+                },
+                {
+                    "id": 2,
+                    "user_email": "sarah.smith@gmail.com",
+                    "action": "Received AI recommendations",
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "ai"
+                },
+                {
+                    "id": 3,
+                    "user_email": "mike.wilson@gmail.com",
+                    "action": "Purchased artwork",
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "purchase"
+                },
+                {
+                    "id": 4,
+                    "user_email": "emma.brown@gmail.com",
+                    "action": "Started chat session",
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "chat"
+                }
+            ]
+        
+        return JSONResponse(content={
+            "success": True,
+            "activities": activities,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting recent activities: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/dashboard/system-health")
+async def get_system_health(current_user: dict = Depends(require_auth)):
+    """Get system health metrics"""
+    try:
+        # Get Redis health
+        redis_healthy = False
+        try:
+            await redis_cache.connect()
+            if redis_cache.client:
+                await redis_cache.client.ping()
+                redis_healthy = True
+        except:
+            redis_healthy = False
+        
+        # Get cache stats
+        cache_stats = await cache_invalidation.get_cache_stats()
+        
+        # Mock system metrics (in production, these would be real)
+        system_health = {
+            "cpu": 45,
+            "memory": 67,
+            "storage": 23,
+            "api_uptime": 99.9,
+            "database_uptime": 99.8,
+            "redis_healthy": redis_healthy,
+            "cache_stats": cache_stats
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "health": system_health,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting system health: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/dashboard/analytics")
+async def get_analytics_data(
+    period: str = "7d",
+    current_user: dict = Depends(require_auth)
+):
+    """Get analytics data for charts"""
+    try:
+        # Mock analytics data (in production, this would be real)
+        analytics = {
+            "period": period,
+            "user_growth": {
+                "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                "data": [120, 150, 180, 200, 250, 300, 280]
+            },
+            "recommendations": {
+                "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                "data": [450, 520, 600, 750, 800, 900, 850]
+            },
+            "revenue": {
+                "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                "data": [1200, 1500, 1800, 2000, 2500, 3000, 2800]
+            },
+            "top_styles": [
+                {"style": "Modern Minimalist", "count": 1250, "percentage": 35},
+                {"style": "Scandinavian", "count": 980, "percentage": 28},
+                {"style": "Contemporary", "count": 750, "percentage": 21},
+                {"style": "Traditional", "count": 520, "percentage": 16}
+            ]
+        }
+        
+        return JSONResponse(content={
+            "success": True,
+            "analytics": analytics,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting analytics data: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Search API Endpoints
+
+@app.get("/api/search")
+async def search_items(
+    q: str,
+    top_k: int = 10,
+    num_results: int = 20,
+    current_user: dict = Depends(optional_auth)
+):
+    """
+    Hybrid search: searches both vector database and Google search engine.
+    First searches in vector DB, then in Google search results.
+    """
+    try:
+        results = hybrid_search(q, top_k, num_results)
+        return JSONResponse(content={
+            "success": True,
+            "query": q,
+            "results": results,
+            "total_results": len(results),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in hybrid search: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/search/vector")
+async def vector_only_search(
+    q: str,
+    top_k: int = 10,
+    current_user: dict = Depends(optional_auth)
+):
+    """
+    Search in vector database only using ChromaDB
+    """
+    try:
+        results = vector_search(q, top_k)
+        return JSONResponse(content={
+            "success": True,
+            "query": q,
+            "results": results,
+            "total_results": len(results),
+            "search_type": "vector",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in vector search: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/search/google")
+async def search_engine_only_search(
+    q: str,
+    num_results: int = 20,
+    current_user: dict = Depends(optional_auth)
+):
+    """
+    Search using Google Custom Search API only
+    """
+    try:
+        results = search_engine_search(q, num_results)
+        return JSONResponse(content={
+            "success": True,
+            "query": q,
+            "results": results,
+            "total_results": len(results),
+            "search_type": "google",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in Google search: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Redis Health Check and Cache Management Endpoints
+
+@app.get("/api/health/redis")
+async def redis_health_check():
+    """Check Redis connection health"""
+    try:
+        await redis_cache.connect()
+        if redis_cache.client:
+            await redis_cache.client.ping()
+            return JSONResponse(content={
+                "status": "healthy",
+                "redis_url": redis_cache.REDIS_URL,
+                "connected": True,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return JSONResponse(content={
+                "status": "unhealthy",
+                "redis_url": redis_cache.REDIS_URL,
+                "connected": False,
+                "error": "Redis client not initialized",
+                "timestamp": datetime.now().isoformat()
+            })
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        return JSONResponse(content={
+            "status": "unhealthy",
+            "redis_url": redis_cache.REDIS_URL,
+            "connected": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
+@app.get("/api/cache/stats")
+async def get_cache_stats(current_user: dict = Depends(require_auth)):
+    """Get cache statistics (admin only)"""
+    try:
+        stats = await cache_invalidation.get_cache_stats()
+        return JSONResponse(content={
+            "success": True,
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/cache/invalidate/user/{user_id}")
+async def invalidate_user_cache(
+    user_id: str,
+    cache_types: Optional[List[str]] = None,
+    current_user: dict = Depends(require_auth)
+):
+    """Invalidate cache for a specific user (admin only)"""
+    try:
+        # Only allow users to invalidate their own cache or admin users
+        if current_user.get("id") != user_id and current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
+        invalidated_count = await cache_invalidation.invalidate_user_cache(user_id, cache_types)
+        return JSONResponse(content={
+            "success": True,
+            "invalidated_count": invalidated_count,
+            "user_id": user_id,
+            "cache_types": cache_types,
+            "timestamp": datetime.now().isoformat()
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error invalidating user cache: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/cache/invalidate/trends")
+async def invalidate_stale_trends(
+    max_age_hours: int = 6,
+    current_user: dict = Depends(require_auth)
+):
+    """Invalidate stale trend data (admin only)"""
+    try:
+        # Only allow admin users
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
+        invalidated_count = await cache_invalidation.invalidate_stale_trends(max_age_hours)
+        return JSONResponse(content={
+            "success": True,
+            "invalidated_count": invalidated_count,
+            "max_age_hours": max_age_hours,
+            "timestamp": datetime.now().isoformat()
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error invalidating stale trends: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/cache/warmup/{user_id}")
+async def warm_up_user_cache(
+    user_id: str,
+    common_styles: Optional[List[str]] = None,
+    current_user: dict = Depends(require_auth)
+):
+    """Warm up cache for a specific user (admin only)"""
+    try:
+        # Only allow admin users
+        if current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
+        warmed_count = await cache_invalidation.warm_up_cache(user_id, common_styles)
+        return JSONResponse(content={
+            "success": True,
+            "warmed_count": warmed_count,
+            "user_id": user_id,
+            "common_styles": common_styles,
+            "timestamp": datetime.now().isoformat()
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error warming up cache: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

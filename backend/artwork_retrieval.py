@@ -3,6 +3,7 @@ import logging
 from typing import List, Dict, Optional, Tuple
 import os
 from datetime import datetime
+from cache import redis_cache
 
 logger = logging.getLogger(__name__)
 
@@ -154,10 +155,23 @@ class ArtworkRetrievalSystem:
             logger.error(f"Error searching similar artworks: {e}")
             return []
     
-    def get_personalized_recommendations(self, room_analysis: Dict, user_preferences: Dict, k: int = 5) -> List[Dict]:
-        """Get personalized artwork recommendations"""
+    async def get_personalized_recommendations(self, room_analysis: Dict, user_preferences: Dict, k: int = 5) -> List[Dict]:
+        """Get personalized artwork recommendations with Redis caching"""
         try:
-            logger.info("Mock getting personalized recommendations")
+            logger.info("Getting personalized recommendations with caching")
+            
+            # Create cache key based on analysis and preferences
+            style = room_analysis.get("aesthetic_style", {}).get("style", "modern")
+            max_price = user_preferences.get("max_price", 500)
+            cache_key = f"recommendations_{style}_{max_price}_{k}"
+            
+            # Check Redis cache first
+            cached_recommendations = await redis_cache.get_cached_artwork_recommendations(
+                cache_key, style
+            )
+            if cached_recommendations:
+                logger.info("Returning cached artwork recommendations from Redis")
+                return cached_recommendations
             
             # Extract style from room analysis
             aesthetic_style = room_analysis.get("aesthetic_style", {})
@@ -181,7 +195,15 @@ class ArtworkRetrievalSystem:
             
             # Sort by price (ascending) and return top k
             filtered_artworks.sort(key=lambda x: x["price"])
-            return filtered_artworks[:k]
+            recommendations = filtered_artworks[:k]
+            
+            # Cache the recommendations in Redis (2 hours TTL)
+            await redis_cache.cache_artwork_recommendations(
+                cache_key, style, recommendations, ttl=7200
+            )
+            logger.info(f"Cached {len(recommendations)} artwork recommendations in Redis")
+            
+            return recommendations
             
         except Exception as e:
             logger.error(f"Error getting personalized recommendations: {e}")

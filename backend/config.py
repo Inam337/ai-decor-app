@@ -41,3 +41,15 @@ ARTWORK_CATALOG_PATH = "data/artwork_catalog.json"
 HOST = "0.0.0.0"
 PORT = 8000
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+
+
+GOOGLE_API_KEY = "AIzaSyAGGCEW5K3-rj9WjqTt2xRwXwYhOxC2L2s"
+GOOGLE_CX = "66d605b6550ff49fd"
+# <script async src="https://cse.google.com/cse.js?cx=66d605b6550ff49fd">
+# </script>
+# <div class="gcse-search"></div>
+DOWNLOAD_DIR = "./assets"
+CHROMA_PERSIST_DIRECTORY = "./chroma_db"
+CHROMA_COLLECTION_NAME = "products"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # sentence-transformers

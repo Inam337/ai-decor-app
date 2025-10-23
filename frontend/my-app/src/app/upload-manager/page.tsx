@@ -6,34 +6,14 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import Footer from '@/components/Footer';
 import AnalysisResults from '@/components/analysis/AnalysisResults';
-
-interface Recommendation {
-  id: string;
-  title: string;
-  price: number;
-  size: string;
-  image_url?: string;
-  style_tags?: string[];
-}
-
-interface AnalysisResult {
-  style: string;
-  confidence: number;
-  colors: {
-    primary: string[];
-    secondary?: string[];
-    accent?: string[];
-  };
-  recommendations: Recommendation[];
-  session_id?: string;
-}
+import { RoomAnalysisResult } from '@/types';
 
 export default function UploadPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<RoomAnalysisResult | null>(null);
   const [location, setLocation] = useState('');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [textDescription, setTextDescription] = useState('');
@@ -137,23 +117,74 @@ export default function UploadPage() {
       clearInterval(progressInterval);
       setProcessingProgress(100);
 
-      // Mock analysis result with color palette and object detection
-      const mockAnalysisResult = {
-        style: 'Modern Minimalist',
-        confidence: 0.87,
-        colors: {
-          primary: ['#E8E2DB', '#C4A484', '#8B4513', '#F5F5DC', '#D2B48C']
+      // Mock analysis result with new API structure
+      const mockAnalysisResult: RoomAnalysisResult = {
+        success: true,
+        room_analysis: {
+          detections: {
+            walls: [
+              { type: "wall", color: "#E8E2DB", area: 15.5 },
+              { type: "wall", color: "#C4A484", area: 12.3 }
+            ],
+            windows: [
+              { type: "window", area: 2.1, position: "north" },
+              { type: "window", area: 1.8, position: "south" }
+            ],
+            furniture: [
+              { name: "sofa", type: "furniture", color: "#8B4513" },
+              { name: "coffee_table", type: "furniture", color: "#654321" },
+              { name: "bookshelf", type: "furniture", color: "#2F4F4F" }
+            ],
+            other: [
+              { name: "lamp", type: "lighting", color: "#FFD700" },
+              { name: "plant", type: "decoration", color: "#228B22" }
+            ]
+          },
+          color_palette: [
+            { rgb: [232, 226, 219], hex: "#E8E2DB", percentage: 35.2 },
+            { rgb: [196, 164, 132], hex: "#C4A484", percentage: 25.8 },
+            { rgb: [139, 69, 19], hex: "#8B4513", percentage: 20.1 },
+            { rgb: [245, 245, 220], hex: "#F5F5DC", percentage: 12.5 },
+            { rgb: [210, 180, 140], hex: "#D2B48C", percentage: 6.4 }
+          ],
+          lighting: {
+            mean_brightness: 125.5,
+            lighting_condition: "moderate"
+          },
+          aesthetic_style: {
+            style: "Modern Minimalist",
+            confidence: 0.87
+          }
         },
         recommendations: [
           {
-            id: '1',
-            title: 'Modern Abstract Art',
+            artwork_id: "art_001",
+            title: "Modern Abstract Art",
+            match_score: 0.95,
+            reasoning: "Perfect match for your modern minimalist style; Complements your neutral color palette",
+            artist: "Jane Smith",
             price: 299,
-            size: '24x36',
-            image_url: 'https://picsum.photos/seed/art1/300/200',
-            style_tags: ['Modern', 'Abstract', 'Contemporary']
+            image_url: "https://picsum.photos/seed/art1/300/200",
+            style: "modern"
           }
-        ]
+        ],
+        trend_insights: {
+          evolution_insights: "Your modern minimalist style is trending. Consider incorporating warm earth tones and natural textures.",
+          trending_complements: ["warm minimalism", "biophilic design", "curved furniture"],
+          trending_styles: ["modern minimalist", "warm minimalism", "biophilic design"],
+          popular_colors: ["warm neutrals", "earth tones", "sage green"],
+          emerging_trends: ["sustainable materials", "curved furniture", "mixed textures"],
+          seasonal_adaptations: {
+            season: "winter",
+            suggestions: ["warm textiles", "cozy lighting", "rich colors"]
+          },
+          analysis_timestamp: new Date().toISOString()
+        },
+        location_suggestions: {
+          nearby_stores: []
+        },
+        final_reasoning: "Your room has a modern minimalist aesthetic with 87% confidence. The dominant colors are warm neutrals. Your space has moderate lighting conditions. Our top recommendation perfectly complements your style.",
+        session_id: "session_upload_manager"
       };
 
       setAnalysisResult(mockAnalysisResult);
@@ -266,22 +297,73 @@ export default function UploadPage() {
         clearInterval(progressInterval);
         setProcessingProgress(100);
 
-        const mockAnalysisResult = {
-          style: 'Contemporary Vibrant',
-          confidence: 0.92,
-          colors: {
-            primary: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+        const mockAnalysisResult: RoomAnalysisResult = {
+          success: true,
+          room_analysis: {
+            detections: {
+              walls: [
+                { type: "wall", color: "#FF6B6B", area: 18.2 },
+                { type: "wall", color: "#4ECDC4", area: 14.7 }
+              ],
+              windows: [
+                { type: "window", area: 3.2, position: "east" },
+                { type: "window", area: 2.8, position: "west" }
+              ],
+              furniture: [
+                { name: "vibrant_sofa", type: "furniture", color: "#45B7D1" },
+                { name: "colorful_chair", type: "furniture", color: "#96CEB4" },
+                { name: "modern_table", type: "furniture", color: "#FFEAA7" }
+              ],
+              other: [
+                { name: "artwork", type: "decoration", color: "#FF6B6B" },
+                { name: "pillow", type: "textile", color: "#4ECDC4" }
+              ]
+            },
+            color_palette: [
+              { rgb: [255, 107, 107], hex: "#FF6B6B", percentage: 30.5 },
+              { rgb: [78, 205, 196], hex: "#4ECDC4", percentage: 25.2 },
+              { rgb: [69, 183, 209], hex: "#45B7D1", percentage: 20.8 },
+              { rgb: [150, 206, 180], hex: "#96CEB4", percentage: 15.3 },
+              { rgb: [255, 234, 167], hex: "#FFEAA7", percentage: 8.2 }
+            ],
+            lighting: {
+              mean_brightness: 145.8,
+              lighting_condition: "bright"
+            },
+            aesthetic_style: {
+              style: "Contemporary Vibrant",
+              confidence: 0.92
+            }
           },
           recommendations: [
             {
-              id: '2',
-              title: 'Vibrant Contemporary Art',
+              artwork_id: "art_002",
+              title: "Vibrant Contemporary Art",
+              match_score: 0.92,
+              reasoning: "Perfect match for your contemporary vibrant style; Bold colors complement your space",
+              artist: "John Doe",
               price: 399,
-              size: '30x40',
-              image_url: 'https://picsum.photos/seed/art2/300/200',
-              style_tags: ['Contemporary', 'Vibrant', 'Bold']
+              image_url: "https://picsum.photos/seed/art2/300/200",
+              style: "contemporary"
             }
-          ]
+          ],
+          trend_insights: {
+            evolution_insights: "Your contemporary vibrant style is very current. Bold colors and dynamic patterns are trending.",
+            trending_complements: ["bold patterns", "mixed textures", "dynamic lighting"],
+            trending_styles: ["contemporary vibrant", "bold contemporary", "dynamic modern"],
+            popular_colors: ["bold reds", "vibrant blues", "energetic yellows"],
+            emerging_trends: ["dynamic patterns", "mixed textures", "bold accents"],
+            seasonal_adaptations: {
+              season: "winter",
+              suggestions: ["warm textiles", "cozy lighting", "rich colors"]
+            },
+            analysis_timestamp: new Date().toISOString()
+          },
+          location_suggestions: {
+            nearby_stores: []
+          },
+          final_reasoning: "Your room has a contemporary vibrant aesthetic with 92% confidence. The bold color palette creates an energetic atmosphere. Your space has bright lighting conditions. Our recommendation perfectly matches your vibrant style.",
+          session_id: "session_voice_analysis"
         };
 
         setAnalysisResult(mockAnalysisResult);
@@ -610,20 +692,7 @@ export default function UploadPage() {
             {/* Step 5: Results */}
             {currentStep === 5 && analysisResult && (
               <AnalysisResults
-                analysisResult={{
-                  colorPalette: analysisResult.colors.primary,
-                  detectedObjects: ['Sofa', 'Coffee Table', 'Window', 'Plant', 'Lamp'], // Mock objects for upload-manager
-                  style: analysisResult.style,
-                  confidence: analysisResult.confidence
-                }}
-                recommendations={analysisResult.recommendations.map(rec => ({
-                  id: rec.id,
-                  title: rec.title,
-                  price: rec.price,
-                  image_url: rec.image_url || 'https://picsum.photos/seed/default/300/200',
-                  style_tags: rec.style_tags || [],
-                  description: `Perfect match for your ${analysisResult.style} style`
-                }))}
+                analysisData={analysisResult}
                 onResetFlow={resetFlow}
               />
             )}

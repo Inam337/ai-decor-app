@@ -97,7 +97,12 @@ export interface ArtworkItem {
 export interface RoomAnalysisResult {
   success: boolean;
   room_analysis: {
-    detections: any;
+    detections: {
+      walls: any[];
+      windows: any[];
+      furniture: any[];
+      other: any[];
+    };
     color_palette: Array<{
       rgb: number[];
       hex: string;
@@ -105,19 +110,23 @@ export interface RoomAnalysisResult {
     }>;
     lighting: {
       mean_brightness: number;
-      std_brightness: number;
-      contrast: number;
       lighting_condition: string;
     };
-    style_embeddings: number[];
     aesthetic_style: {
       style: string;
       confidence: number;
-      all_scores: number[];
     };
-    analysis_timestamp: string;
   };
-  recommendations: ArtworkItem[];
+  recommendations: Array<{
+    artwork_id: string;
+    title: string;
+    match_score: number;
+    reasoning: string;
+    artist?: string;
+    price?: number;
+    image_url?: string;
+    style?: string;
+  }>;
   trend_insights: TrendInsights;
   location_suggestions: LocationSuggestions;
   final_reasoning: string;
