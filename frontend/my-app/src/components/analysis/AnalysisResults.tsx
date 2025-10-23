@@ -5,6 +5,9 @@ interface AnalysisResult {
   detectedObjects: string[];
   style: string;
   confidence: number;
+  wallColors?: string[];
+  lighting?: string;
+  roomType?: string;
 }
 
 interface Recommendation {
@@ -119,28 +122,72 @@ export default function AnalysisResults({
           </div>
         </div>
 
-        {/* Style Analysis Section - MANDATORY */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl shadow-xl p-8 border-2 border-blue-200">
+        {/* Analysis Attributes Section - MANDATORY */}
+        <div className="bg-white rounded-3xl shadow-xl p-8 border-2 border-gray-200">
           <div className="text-center mb-6">
-            <h4 className="text-2xl font-bold text-gray-900 mb-2">🎯 Style Analysis</h4>
-            <p className="text-gray-600">AI-detected design style and characteristics</p>
+            <h4 className="text-2xl font-bold text-gray-900 mb-2">📊 Analysis</h4>
+            <p className="text-gray-600">Detailed room analysis results</p>
             <div className="mt-2">
               <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">MANDATORY</span>
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="text-center">
-              <h5 className="text-xl font-bold text-gray-900 mb-2">{analysisResult.style}</h5>
-              <p className="text-gray-600 mb-4">Detected Design Style</p>
-              <div className="flex justify-center items-center space-x-4">
-                <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-gray-700">Confidence Level</p>
-                  <p className="text-2xl font-bold text-green-600">{(analysisResult.confidence * 100).toFixed(0)}%</p>
-                </div>
-                <div className="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-gray-700">Style Category</p>
-                  <p className="text-lg font-bold text-blue-600">Modern</p>
-                </div>
+          
+          <div className="space-y-6">
+            {/* Wall Color */}
+            <div className="flex items-center justify-between py-4 border-b border-gray-100">
+              <div className="text-left">
+                <p className="text-gray-700 font-medium">Wall Color</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                {analysisResult.wallColors && analysisResult.wallColors.length > 0 ? (
+                  analysisResult.wallColors.slice(0, 2).map((color, index) => (
+                    <div 
+                      key={index}
+                      className="w-8 h-8 rounded border-2 border-white shadow-sm"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    ></div>
+                  ))
+                ) : (
+                  <>
+                    <div className="w-8 h-8 bg-gray-800 rounded border-2 border-white shadow-sm"></div>
+                    <div className="w-8 h-8 bg-gray-300 rounded border-2 border-white shadow-sm"></div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Lighting */}
+            <div className="flex items-center justify-between py-4 border-b border-gray-100">
+              <div className="text-left">
+                <p className="text-gray-700 font-medium">Lighting</p>
+              </div>
+              <div className="text-right">
+                <span className="text-yellow-600 font-semibold">
+                  {analysisResult.lighting || 'Natural Light'}
+                </span>
+              </div>
+            </div>
+
+            {/* Room Type */}
+            <div className="flex items-center justify-between py-4 border-b border-gray-100">
+              <div className="text-left">
+                <p className="text-gray-700 font-medium">Room Type</p>
+              </div>
+              <div className="text-right">
+                <span className="text-blue-600 font-semibold">
+                  {analysisResult.roomType || 'Living Room'}
+                </span>
+              </div>
+            </div>
+
+            {/* Style Detected */}
+            <div className="flex items-center justify-between py-4">
+              <div className="text-left">
+                <p className="text-gray-700 font-medium">Style Detected</p>
+              </div>
+              <div className="text-right">
+                <span className="text-purple-600 font-semibold">{analysisResult.style}</span>
               </div>
             </div>
           </div>
