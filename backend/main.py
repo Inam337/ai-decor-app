@@ -50,6 +50,30 @@ class VoiceQuery(BaseModel):
     user_id: str
     location: Optional[str] = None
 
+class ExternalItem(BaseModel):
+    id: str
+    title: str
+    price: float
+    currency: str
+    image_url: str
+    store: str
+    store_url: str
+    availability: str
+    category: str
+    tags: List[str]
+    description: str
+
+class SearchFilters(BaseModel):
+    style: Optional[str] = None
+    colorPalette: Optional[List[str]] = None
+    priceRange: Optional[Dict[str, float]] = None
+    category: Optional[str] = None
+    availability: Optional[str] = None
+
+class ExternalSearchRequest(BaseModel):
+    query: str
+    filters: Optional[SearchFilters] = None
+
 class RecommendationRequest(BaseModel):
     user_id: str
     room_analysis: Optional[Dict] = None
@@ -107,7 +131,7 @@ async def health_check():
 async def analyze_room(
     image: UploadFile = File(...),
     location: Optional[str] = Form(None),
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Analyze room image and provide décor recommendations"""
     try:
@@ -139,7 +163,7 @@ async def analyze_room(
 async def process_text_query(
     query: str = Form(...),
     location: Optional[str] = Form(None),
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Process text-based queries for décor recommendations"""
     try:
@@ -158,7 +182,7 @@ async def process_text_query(
 async def process_voice_query(
     audio_data: str = Form(...),
     location: Optional[str] = Form(None),
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Process voice queries for décor recommendations"""
     try:
@@ -178,7 +202,7 @@ async def process_voice_query(
 @app.post("/api/user-profile")
 async def create_user_profile(
     preferences: Dict,
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Create or update user profile"""
     try:
@@ -197,7 +221,7 @@ async def create_user_profile(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/user-profile")
-async def get_user_profile(current_user: dict = Depends(require_auth())):
+async def get_user_profile(current_user: dict = Depends(require_auth)):
     """Get current user's profile"""
     try:
         profile = await supabase_client.get_user_profile(current_user["user_id"])
@@ -214,7 +238,7 @@ async def get_user_profile(current_user: dict = Depends(require_auth())):
 @app.put("/api/user-profile")
 async def update_user_profile(
     preferences: Dict,
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Update user preferences"""
     try:
@@ -232,7 +256,7 @@ async def update_user_profile(
 @app.get("/api/user-sessions")
 async def get_user_sessions(
     limit: int = 10,
-    current_user: dict = Depends(require_auth())
+    current_user: dict = Depends(require_auth)
 ):
     """Get user's recent sessions"""
     try:
@@ -241,6 +265,71 @@ async def get_user_sessions(
         
     except Exception as e:
         logger.error(f"Error getting user sessions: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/search-context")
+async def get_search_context(current_user: dict = Depends(require_auth)):
+    """Get user's current search context"""
+    try:
+        context = await supabase_client.get_search_context(current_user["user_id"])
+        
+        if context:
+            return JSONResponse(content={
+                "success": True, 
+                "context": context,
+                "has_context": True
+            })
+        else:
+            return JSONResponse(content={
+                "success": True, 
+                "context": None,
+                "has_context": False
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting search context: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.delete("/api/search-context")
+async def clear_search_context(current_user: dict = Depends(require_auth)):
+    """Clear user's search context"""
+    try:
+        # In a real implementation, this would delete the context from database
+        # For mock implementation, we'll just return success
+        logger.info(f"Clearing search context for user {current_user['user_id']}")
+        
+        return JSONResponse(content={
+            "success": True, 
+            "message": "Search context cleared successfully"
+        })
+            
+    except Exception as e:
+        logger.error(f"Error clearing search context: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/search-context/update")
+async def update_search_context(
+    additional_context: Dict,
+    current_user: dict = Depends(require_auth)
+):
+    """Update user's search context with additional information"""
+    try:
+        result = await supabase_client.update_search_context(
+            current_user["user_id"], 
+            additional_context
+        )
+        
+        if result:
+            return JSONResponse(content={
+                "success": True, 
+                "message": "Search context updated successfully",
+                "context": result
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update search context")
+            
+    except Exception as e:
+        logger.error(f"Error updating search context: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/trends")
@@ -308,6 +397,141 @@ async def search_artwork(query: str, k: int = 5):
         
     except Exception as e:
         logger.error(f"Error searching artwork: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# External API Integration Endpoints
+@app.post("/api/external/search")
+async def search_external_items(request: ExternalSearchRequest):
+    """Search items across IKEA, Etsy, and PosterStore"""
+    try:
+        # Mock data for development - replace with actual API calls
+        mock_items = [
+            {
+                "id": "ikea-001",
+                "title": "Framsta Wall Art - Modern Abstract",
+                "price": 29.99,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/ikea1/300/300",
+                "store": "IKEA",
+                "store_url": "https://www.ikea.com/us/en/p/framsta-wall-art-modern-abstract-00412345/",
+                "availability": "in_stock",
+                "category": "Wall Art",
+                "tags": ["Modern", "Abstract", "Minimalist"],
+                "description": "Contemporary wall art with clean lines and neutral colors"
+            },
+            {
+                "id": "etsy-001",
+                "title": "Handmade Ceramic Vase - Blue",
+                "price": 45.00,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/etsy1/300/300",
+                "store": "Etsy",
+                "store_url": "https://www.etsy.com/listing/1234567890/handmade-ceramic-vase-blue",
+                "availability": "in_stock",
+                "category": "Decor",
+                "tags": ["Handmade", "Ceramic", "Blue", "Artisan"],
+                "description": "Unique handcrafted ceramic vase with beautiful blue glaze"
+            },
+            {
+                "id": "posterstore-001",
+                "title": "Minimalist Typography Poster",
+                "price": 24.99,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/poster1/300/300",
+                "store": "PosterStore",
+                "store_url": "https://www.posterstore.com/minimalist-typography-poster",
+                "availability": "in_stock",
+                "category": "Posters",
+                "tags": ["Typography", "Minimalist", "Black", "White"],
+                "description": "Clean typography poster with inspirational quote"
+            }
+        ]
+        
+        # Filter items based on search criteria
+        filtered_items = mock_items
+        
+        if request.filters:
+            if request.filters.style:
+                filtered_items = [item for item in filtered_items 
+                                if any(tag.lower() in request.filters.style.lower() 
+                                      for tag in item["tags"])]
+            
+            if request.filters.colorPalette:
+                filtered_items = [item for item in filtered_items 
+                                if any(tag.lower() in color.lower().replace('#', '') 
+                                      for tag in item["tags"] 
+                                      for color in request.filters.colorPalette)]
+            
+            if request.filters.priceRange:
+                min_price = request.filters.priceRange.get("min", 0)
+                max_price = request.filters.priceRange.get("max", 1000)
+                filtered_items = [item for item in filtered_items 
+                                if min_price <= item["price"] <= max_price]
+            
+            if request.filters.category:
+                filtered_items = [item for item in filtered_items 
+                                if request.filters.category.lower() in item["category"].lower()]
+            
+            if request.filters.availability and request.filters.availability != "all":
+                filtered_items = [item for item in filtered_items 
+                                if item["availability"] == request.filters.availability]
+        
+        return JSONResponse(content={"success": True, "items": filtered_items})
+        
+    except Exception as e:
+        logger.error(f"Error searching external items: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/external/trending")
+async def get_trending_items():
+    """Get trending items from all stores"""
+    try:
+        trending_items = [
+            {
+                "id": "trending-001",
+                "title": "Trending: Modern Abstract Canvas",
+                "price": 89.99,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/trending1/300/300",
+                "store": "Etsy",
+                "store_url": "https://www.etsy.com/listing/trending1",
+                "availability": "in_stock",
+                "category": "Art",
+                "tags": ["Trending", "Modern", "Abstract", "Canvas"],
+                "description": "Currently trending modern abstract canvas art"
+            },
+            {
+                "id": "trending-002",
+                "title": "Popular: Minimalist Wall Shelf",
+                "price": 45.00,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/trending2/300/300",
+                "store": "IKEA",
+                "store_url": "https://www.ikea.com/us/en/p/trending2",
+                "availability": "in_stock",
+                "category": "Shelving",
+                "tags": ["Popular", "Minimalist", "Wall", "Shelf"],
+                "description": "Popular minimalist wall shelf design"
+            },
+            {
+                "id": "trending-003",
+                "title": "Hot: Boho Macrame Plant Hanger",
+                "price": 32.00,
+                "currency": "USD",
+                "image_url": "https://picsum.photos/seed/trending3/300/300",
+                "store": "Etsy",
+                "store_url": "https://www.etsy.com/listing/trending3",
+                "availability": "in_stock",
+                "category": "Plant Accessories",
+                "tags": ["Hot", "Boho", "Macrame", "Plant"],
+                "description": "Hot trending boho macrame plant hanger"
+            }
+        ]
+        
+        return JSONResponse(content={"success": True, "items": trending_items})
+        
+    except Exception as e:
+        logger.error(f"Error getting trending items: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

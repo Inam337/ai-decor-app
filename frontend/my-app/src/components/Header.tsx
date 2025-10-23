@@ -49,7 +49,7 @@ export default function Header({ className = '' }: HeaderProps) {
     : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
 
   return (
-    <header className={`${headerGradient} backdrop-blur-sm border-b fixed top-0 left-0 z-90 w-full border-gray-200/50 ${className}`}>
+    <header className={`${headerGradient} backdrop-blur-sm border-b fixed top-0 left-0 z-50 w-full border-gray-200/50 ${className}`}>
       <div className="max-w-6xl mx-auto px-4 py-1">
         <div className="flex justify-between items-center">
           {/* Logo */}

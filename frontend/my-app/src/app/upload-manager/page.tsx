@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Link from "next/link";
 import { useAIAnalysis } from '@/components/ai/AIIntegration';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import Footer from '@/components/Footer';
+import AnalysisResults from '@/components/analysis/AnalysisResults';
 
 interface Recommendation {
   id: string;
@@ -64,7 +64,7 @@ export default function UploadPage() {
         // Simulate upload progress
         await new Promise(resolve => setTimeout(resolve, 1000));
         setUploadedFiles(prev => [...prev, ...files]);
-        
+
         // Set image preview for the first file
         if (files[0]) {
           const reader = new FileReader();
@@ -73,7 +73,7 @@ export default function UploadPage() {
           };
           reader.readAsDataURL(files[0]);
         }
-        
+
         setCurrentStep(2); // Move to describe/voice step
       } catch (error) {
         console.error('Upload failed:', error);
@@ -88,7 +88,7 @@ export default function UploadPage() {
     const files = Array.from(event.dataTransfer.files);
     if (files.length > 0) {
       setUploadedFiles(files);
-      
+
       // Set image preview for the first file
       if (files[0]) {
         const reader = new FileReader();
@@ -97,7 +97,7 @@ export default function UploadPage() {
         };
         reader.readAsDataURL(files[0]);
       }
-      
+
       setCurrentStep(2); // Move to describe/voice step
     }
   };
@@ -114,11 +114,11 @@ export default function UploadPage() {
 
   const processTextInput = async () => {
     if (!textDescription.trim() || uploadedFiles.length === 0) return;
-    
+
     setCurrentStep(4); // Move to processing step
     setIsProcessing(true);
     setProcessingProgress(0);
-    
+
     try {
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -133,10 +133,10 @@ export default function UploadPage() {
 
       // Simulate image analysis
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       clearInterval(progressInterval);
       setProcessingProgress(100);
-      
+
       // Mock analysis result with color palette and object detection
       const mockAnalysisResult = {
         style: 'Modern Minimalist',
@@ -155,10 +155,10 @@ export default function UploadPage() {
           }
         ]
       };
-      
+
       setAnalysisResult(mockAnalysisResult);
       setCurrentStep(5); // Move to results step
-      
+
     } catch (error) {
       console.error('Analysis failed:', error);
     } finally {
@@ -168,18 +168,18 @@ export default function UploadPage() {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           sampleRate: 44100
-        } 
+        }
       });
-      
+
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
-      
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -191,10 +191,10 @@ export default function UploadPage() {
 
       mediaRecorder.onstop = async () => {
         try {
-          const audioBlob = new Blob(audioChunksRef.current, { 
-            type: 'audio/webm;codecs=opus' 
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: 'audio/webm;codecs=opus'
           });
-          
+
           if (audioBlob.size > 0) {
             await processVoiceInput(audioBlob);
           } else {
@@ -219,7 +219,7 @@ export default function UploadPage() {
 
       mediaRecorder.start(1000);
       setIsRecording(true);
-      
+
     } catch (error) {
       console.error('Error starting recording:', error);
       alert('Unable to access microphone. Please check your permissions and try again.');
@@ -241,16 +241,16 @@ export default function UploadPage() {
 
   const processVoiceInput = async (audioBlob: Blob) => {
     if (uploadedFiles.length === 0) return;
-    
+
     setCurrentStep(4); // Move to processing step
     setIsProcessing(true);
     setProcessingProgress(0);
-    
+
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64Audio = reader.result as string;
-        
+
         const progressInterval = setInterval(() => {
           setProcessingProgress(prev => {
             if (prev >= 90) {
@@ -262,10 +262,10 @@ export default function UploadPage() {
         }, 300);
 
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         clearInterval(progressInterval);
         setProcessingProgress(100);
-        
+
         const mockAnalysisResult = {
           style: 'Contemporary Vibrant',
           confidence: 0.92,
@@ -283,13 +283,13 @@ export default function UploadPage() {
             }
           ]
         };
-        
+
         setAnalysisResult(mockAnalysisResult);
         setCurrentStep(5); // Move to results step
       };
-      
+
       reader.readAsDataURL(audioBlob);
-      
+
     } catch (error) {
       console.error('Voice processing failed:', error);
     } finally {
@@ -332,25 +332,23 @@ export default function UploadPage() {
             <div className="flex items-center justify-center space-x-2">
               {[1, 2, 3, 4, 5].map((step) => (
                 <div key={step} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs transition-all ${
-                    step === currentStep 
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg' 
-                      : step < currentStep 
-                        ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs transition-all ${step === currentStep
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                      : step < currentStep
+                        ? 'bg-gradient-to-r from-green-500 to-green-600 text-white'
                         : 'bg-gray-200 text-gray-500'
-                  }`}>
+                    }`}>
                     {step < currentStep ? '✓' : step}
                   </div>
                   {step < 5 && (
-                    <div className={`w-12 h-1 mx-1 rounded ${
-                      step < currentStep 
-                        ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                    <div className={`w-12 h-1 mx-1 rounded ${step < currentStep
+                        ? 'bg-gradient-to-r from-green-500 to-green-600'
                         : 'bg-gray-200'
-                    }`} />
+                      }`} />
                   )}
                 </div>
               ))}
-                </div>
+            </div>
             <div className="text-center mt-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 {currentStep === 1 && 'Step 1: Location'}
@@ -371,7 +369,7 @@ export default function UploadPage() {
 
           {/* Step Content */}
           <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-8 min-h-[500px] relative">
-            
+
             {/* Back Button - Top Left */}
             {currentStep > 1 && (
               <button
@@ -384,7 +382,7 @@ export default function UploadPage() {
                 <span>Back</span>
               </button>
             )}
-            
+
             {/* Step 1: Location */}
             {currentStep === 1 && (
               <div className="text-center">
@@ -399,22 +397,22 @@ export default function UploadPage() {
                   Help us find nearby stores and local trends to provide better recommendations
                 </p>
                 <div className="max-w-md mx-auto">
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g., New York, NY"
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g., New York, NY"
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
-                        />
-                        <button
+                  />
+                  <button
                     onClick={nextStep}
                     className="w-full mt-6 bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl"
-                        >
+                  >
                     Continue
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Step 2: Choose Input Method */}
             {currentStep === 2 && (
@@ -428,17 +426,17 @@ export default function UploadPage() {
                 <p className="text-gray-600 mb-8 max-w-md mx-auto">
                   Now tell us about your design preferences
                 </p>
-                
+
                 {/* Show uploaded image preview */}
                 {imagePreview && (
                   <div className="mb-8">
                     <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden shadow-lg">
                       <img src={imagePreview} alt="Uploaded space" className="w-full h-full object-cover" />
-                          </div>
+                    </div>
                     <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
                   </div>
                 )}
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                   {/* Text Input Option */}
                   <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 hover:shadow-lg transition-all cursor-pointer" onClick={() => handleOptionClick('text')}>
@@ -477,7 +475,7 @@ export default function UploadPage() {
                 <p className="text-gray-600 mb-8 max-w-md mx-auto">
                   Tell us about your design preferences in detail
                 </p>
-                
+
                 {/* Show uploaded image preview */}
                 {imagePreview && (
                   <div className="mb-8">
@@ -487,7 +485,7 @@ export default function UploadPage() {
                     <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
                   </div>
                 )}
-                
+
                 <div className="max-w-2xl mx-auto">
                   <textarea
                     value={textDescription}
@@ -523,7 +521,7 @@ export default function UploadPage() {
                 <p className="text-gray-600 mb-8 max-w-md mx-auto">
                   Click to start recording your design preferences
                 </p>
-                
+
                 {/* Show uploaded image preview */}
                 {imagePreview && (
                   <div className="mb-8">
@@ -533,27 +531,40 @@ export default function UploadPage() {
                     <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
                   </div>
                 )}
-                
+
+                {/* Compact Voice Recording Bar */}
                 <div className="max-w-md mx-auto">
-                  <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-6 ${
-                    isRecording ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-red-500'
-                  }`}>
-                    <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
+                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-red-500'
+                          }`}>
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {isRecording ? 'Recording...' : 'Voice Input'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {isRecording ? 'Click to stop' : 'Click to start recording'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={isProcessing}
+                        className={`px-6 py-2 rounded-lg font-medium text-sm transition-all ${isRecording
+                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                            : 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90 text-white'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {isRecording ? 'Stop' : 'Record'}
+                      </button>
+                    </div>
                   </div>
-                 
-                  <button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isProcessing}
-                    className={`px-8 py-4 rounded-2xl font-semibold text-lg transition-all ${
-                      isRecording 
-                        ? 'bg-red-500 hover:bg-red-600 text-white' 
-                        : 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90 text-white'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                  </button>
                 </div>
               </div>
             )}
@@ -565,10 +576,10 @@ export default function UploadPage() {
                   <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
-            </div>
+                </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis in Progress</h3>
                 <p className="text-gray-600 mb-8">Our AI is analyzing your image and preferences</p>
-                
+
                 <div className="max-w-md mx-auto">
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">
@@ -582,7 +593,7 @@ export default function UploadPage() {
                       ></div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6">
                     <p className="text-gray-700 font-medium">
                       {processingProgress < 25 && "Processing image..."}
@@ -598,104 +609,23 @@ export default function UploadPage() {
 
             {/* Step 5: Results */}
             {currentStep === 5 && analysisResult && (
-              <div className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Analysis Complete!</h3>
-                <p className="text-gray-600 mb-8">Your personalized analysis and recommendations are ready</p>
-
-                <div className="max-w-4xl mx-auto space-y-8">
-                  {/* Image Analysis Results */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Color Palette */}
-                    <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
-                      <h4 className="text-xl font-bold text-gray-900 mb-4">Color Palette</h4>
-                      <div className="flex justify-center space-x-3 mb-4">
-                        {analysisResult.colors.primary.map((color: string, index: number) => (
-                          <div
-                            key={index}
-                            className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg"
-                            style={{ backgroundColor: color }}
-                            title={color}
-                          ></div>
-                        ))}
-                      </div>
-                      <p className="text-sm text-gray-600">Detected from your space</p>
-                    </div>
-
-                    {/* Style Analysis */}
-                    <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
-                      <h4 className="text-xl font-bold text-gray-900 mb-4">Style Analysis</h4>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-600 mb-2">Detected Style</p>
-                          <p className="font-bold text-gray-900 text-lg capitalize">{analysisResult.style}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 mb-2">Confidence</p>
-                          <p className="font-bold text-green-600 text-lg">{(analysisResult.confidence * 100).toFixed(0)}%</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recommendations */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {analysisResult.recommendations.map((rec) => (
-                      <div key={rec.id} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 hover:shadow-lg transition-all">
-                        <img 
-                          src={rec.image_url} 
-                          alt={rec.title}
-                          className="w-full h-48 object-cover rounded-lg mb-4"
-                        />
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h4>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {rec.style_tags?.map((tag: string, index: number) => (
-                            <span key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xl font-bold text-gray-900">${rec.price}</span>
-                          <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                            View Details
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-4">
-                    <Link
-                      href="/recommendations"
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl block"
-                    >
-                      View All Recommendations
-                    </Link>
-                    <Link
-                      href="/chat"
-                      className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white py-3 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all block"
-                    >
-                      Chat with AI
-                    </Link>
-                  </div>
-
-                  {/* Navigation */}
-                  <div className="flex justify-center mt-8">
-                    <button
-                      onClick={resetFlow}
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all"
-                    >
-                      Start Over
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <AnalysisResults
+                analysisResult={{
+                  colorPalette: analysisResult.colors.primary,
+                  detectedObjects: ['Sofa', 'Coffee Table', 'Window', 'Plant', 'Lamp'], // Mock objects for upload-manager
+                  style: analysisResult.style,
+                  confidence: analysisResult.confidence
+                }}
+                recommendations={analysisResult.recommendations.map(rec => ({
+                  id: rec.id,
+                  title: rec.title,
+                  price: rec.price,
+                  image_url: rec.image_url || 'https://picsum.photos/seed/default/300/200',
+                  style_tags: rec.style_tags || [],
+                  description: `Perfect match for your ${analysisResult.style} style`
+                }))}
+                onResetFlow={resetFlow}
+              />
             )}
           </div>
         </main>

@@ -1,13 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from "next/link";
-import { apiService, TrendingStyle } from '@/services/api';
+import { useState, useEffect, useCallback } from 'react';
+import { apiService } from '@/services/api';
+import { externalAPIsService, ExternalItem, SearchFilters } from '@/services/externalApis';
+
+// Define TrendingStyle type locally since it was removed from api service
+interface TrendingStyle {
+  title: string;
+  content: string;
+  relevance_score: number;
+  trend_type: string;
+}
 
 export default function TrendingPage() {
   const [trends, setTrends] = useState<TrendingStyle[]>([]);
+  const [trendingItems, setTrendingItems] = useState<ExternalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [viewMode, setViewMode] = useState<'trends' | 'items'>('trends');
 
   const categories = [
     { value: 'all', label: 'All Trends' },
@@ -18,38 +28,104 @@ export default function TrendingPage() {
     { value: 'finish', label: 'Finishes' }
   ];
 
-  useEffect(() => {
-    loadTrends();
-  }, []);
+  const getMockTrends = (): TrendingStyle[] => [
+    {
+      title: 'Minimalist Scandinavian Design',
+      content: 'Clean lines, neutral colors, and natural materials continue to dominate interior design trends.',
+      relevance_score: 0.9,
+      trend_type: 'style'
+    },
+    {
+      title: 'Sustainable Eco-Friendly Decor',
+      content: 'Biophilic design and sustainable materials are gaining popularity in home decor.',
+      relevance_score: 0.8,
+      trend_type: 'material'
+    },
+    {
+      title: 'Warm Earth Tones',
+      content: 'Terracotta, sage green, and warm beiges are replacing cool grays in color palettes.',
+      relevance_score: 0.85,
+      trend_type: 'color'
+    },
+    {
+      title: 'Maximalist Bold Patterns',
+      content: 'Bold patterns, vibrant colors, and eclectic mixes are making a comeback in modern interiors.',
+      relevance_score: 0.75,
+      trend_type: 'style'
+    },
+    {
+      title: 'Natural Wood Finishes',
+      content: 'Raw wood textures and natural finishes are becoming increasingly popular for furniture and decor.',
+      relevance_score: 0.82,
+      trend_type: 'material'
+    },
+    {
+      title: 'Jewel Tone Accents',
+      content: 'Rich emerald, sapphire, and amethyst colors are being used as accent pieces in neutral spaces.',
+      relevance_score: 0.78,
+      trend_type: 'color'
+    },
+    {
+      title: 'Curved Furniture Lines',
+      content: 'Soft curves and organic shapes are replacing sharp angles in contemporary furniture design.',
+      relevance_score: 0.88,
+      trend_type: 'form'
+    },
+    {
+      title: 'Matte Black Finishes',
+      content: 'Matte black hardware and fixtures are trending for a sophisticated, modern look.',
+      relevance_score: 0.79,
+      trend_type: 'finish'
+    }
+  ];
 
-  const loadTrends = async () => {
+  const loadTrends = useCallback(async () => {
     try {
       setLoading(true);
-      const results = await apiService.getTrendingStyles('interior design trends 2024', 15);
-      setTrends(results);
+      // Check if the method exists before calling it
+      if (apiService.getTrendingStyles) {
+        const results = await apiService.getTrendingStyles('interior design trends 2024', 15);
+        setTrends(results);
+      } else {
+        // Use mock data if method doesn't exist
+        setTrends(getMockTrends());
+      }
     } catch (error) {
       console.error('Failed to load trends:', error);
       // Fallback to mock data
-      setTrends([
-        {
-          title: 'Minimalist Scandinavian Design',
-          content: 'Clean lines, neutral colors, and natural materials continue to dominate interior design trends.',
-          relevance_score: 0.9,
-          trend_type: 'style'
-        },
-        {
-          title: 'Sustainable Eco-Friendly Decor',
-          content: 'Biophilic design and sustainable materials are gaining popularity in home decor.',
-          relevance_score: 0.8,
-          trend_type: 'material'
-        },
-        {
-          title: 'Warm Earth Tones',
-          content: 'Terracotta, sage green, and warm beiges are replacing cool grays in color palettes.',
-          relevance_score: 0.85,
-          trend_type: 'color'
-        }
-      ]);
+      setTrends(getMockTrends());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadTrendingItems = async () => {
+    try {
+      const items = await externalAPIsService.getTrendingItems();
+      setTrendingItems(items);
+    } catch (error) {
+      console.error('Failed to load trending items:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadTrends();
+    loadTrendingItems();
+  }, [loadTrends]);
+
+  const searchItemsByTrend = async (trend: TrendingStyle) => {
+    try {
+      setLoading(true);
+      const filters: SearchFilters = {
+        style: trend.title,
+        availability: 'in_stock'
+      };
+      
+      const items = await externalAPIsService.searchItems(trend.title, filters);
+      setTrendingItems(items);
+      setViewMode('items');
+    } catch (error) {
+      console.error('Failed to search items by trend:', error);
     } finally {
       setLoading(false);
     }
@@ -104,10 +180,110 @@ export default function TrendingPage() {
       <main className="max-w-7xl mx-auto px-4 py-8 pt-20">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Trending Design Styles</h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover the latest interior design trends and get inspired for your space
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            {viewMode === 'trends' ? '🔍 Find Items - Browse Available Online Items' : '🛍️ Available Items from IKEA, Etsy & PosterStore'}
+          </h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-6">
+            {viewMode === 'trends' 
+              ? 'Discover trending design styles and find related items from IKEA, Etsy, and PosterStore'
+              : 'Browse available items from IKEA, Etsy, and PosterStore - Skip reasoning agent, direct to VDB'
+            }
           </p>
+          
+          {/* Store Integration Status */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">IKEA API</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">Etsy API</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">PosterStore API</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* View Mode Toggle */}
+          <div className="flex justify-center">
+            <div className="bg-white rounded-xl p-1 shadow-sm">
+              <button
+                onClick={() => setViewMode('trends')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                  viewMode === 'trends'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Design Trends
+              </button>
+              <button
+                onClick={() => setViewMode('items')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                  viewMode === 'items'
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Available Items
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* API Integration Showcase */}
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-3xl p-8 mb-8 border-2 border-green-200">
+          <div className="text-center mb-6">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">🚀 Direct API Integration</h3>
+            <p className="text-gray-600">Skip reasoning agent • Direct to VDB • Real-time data</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* IKEA Integration */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg text-center">
+              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-2xl font-bold">I</span>
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 mb-2">IKEA API</h4>
+              <p className="text-sm text-gray-600 mb-4">Direct integration with IKEA&apos;s product catalog</p>
+              <div className="flex justify-center space-x-2">
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Live Pricing</span>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Stock Status</span>
+              </div>
+            </div>
+
+            {/* Etsy Integration */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg text-center">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-2xl font-bold">E</span>
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 mb-2">Etsy API</h4>
+              <p className="text-sm text-gray-600 mb-4">Access to handmade and vintage items</p>
+              <div className="flex justify-center space-x-2">
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Handmade</span>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Unique</span>
+              </div>
+            </div>
+
+            {/* PosterStore Integration */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg text-center">
+              <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-2xl font-bold">P</span>
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 mb-2">PosterStore API</h4>
+              <p className="text-sm text-gray-600 mb-4">Art prints and wall decorations</p>
+              <div className="flex justify-center space-x-2">
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Art Prints</span>
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Wall Art</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Category Filter */}
@@ -129,7 +305,7 @@ export default function TrendingPage() {
           </div>
         </div>
 
-        {/* Trends */}
+        {/* Content */}
         {loading ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -138,9 +314,14 @@ export default function TrendingPage() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-            <p className="text-gray-600">Loading trending styles...</p>
+            <p className="text-gray-600">
+              {viewMode === 'trends' ? 'Loading trending styles...' : 'Loading available items...'}
+            </p>
           </div>
         ) : (
+          <>
+            {/* Trends View */}
+            {viewMode === 'trends' && (
           <>
             <div className="flex justify-between items-center mb-6">
               <p className="text-gray-600">
@@ -182,10 +363,16 @@ export default function TrendingPage() {
                     
                     {/* Action */}
                     <div className="flex space-x-2">
-                      <button className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
-                        Get Inspired
+                      <button 
+                        onClick={() => searchItemsByTrend(trend)}
+                        className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-4 rounded-lg text-sm font-semibold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        🔍 Find Items
+                        <div className="text-xs font-normal mt-1 opacity-90">
+                          Skip reasoning • Direct to VDB
+                        </div>
                       </button>
-                      <button className="bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                      <button className="bg-gray-100 text-gray-700 py-3 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                         Save
                       </button>
                     </div>
@@ -208,19 +395,107 @@ export default function TrendingPage() {
           </>
         )}
 
-        {/* Call to Action */}
-        <div className="mt-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-8 text-center text-white">
-          <h3 className="text-2xl font-bold mb-4">Ready to Transform Your Space?</h3>
-          <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-            Upload your room photo and get personalized artwork recommendations based on the latest trends
-          </p>
-          <Link
-            href="/upload-manager"
-            className="inline-block bg-white text-blue-600 px-8 py-3 rounded-xl font-medium hover:bg-gray-100 transition-colors"
-          >
-            Get Started
-          </Link>
+            {/* Items View */}
+            {viewMode === 'items' && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <p className="text-gray-600 text-lg">
+                      Showing {trendingItems.length} available item{trendingItems.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Direct integration with IKEA, Etsy, and PosterStore APIs
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">IKEA</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">Etsy</span>
+                    <span className="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full font-medium">PosterStore</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {trendingItems.map((item) => (
+                    <div key={item.id} className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-xl transition-all transform hover:scale-105">
+                      {/* Store Badge */}
+                      <div className="relative">
+                        <img 
+                          src={item.image_url} 
+                          alt={item.title}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute top-3 left-3">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            item.store === 'IKEA' ? 'bg-blue-500 text-white shadow-lg' :
+                            item.store === 'Etsy' ? 'bg-green-500 text-white shadow-lg' :
+                            'bg-purple-500 text-white shadow-lg'
+                          }`}>
+                            {item.store} API
+                          </span>
+                        </div>
+                        <div className="absolute top-3 right-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            item.availability === 'in_stock' ? 'bg-green-500 text-white' :
+                            item.availability === 'limited' ? 'bg-yellow-500 text-white' :
+                            'bg-red-500 text-white'
+                          }`}>
+                            {item.availability === 'in_stock' ? 'In Stock' :
+                             item.availability === 'limited' ? 'Limited' : 'Out of Stock'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{item.description}</p>
+                        
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {item.tags.slice(0, 3).map((tag, index) => (
+                            <span key={index} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Price and Action */}
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-xl font-bold text-gray-900">${item.price}</span>
+                            <span className="text-sm text-gray-500 ml-1">{item.currency}</span>
+                          </div>
+                          <a
+                            href={item.store_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:from-orange-600 hover:to-red-600 transition-all shadow-lg hover:shadow-xl"
+                          >
+                            View Item
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {trendingItems.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No items found</h3>
+                    <p className="text-gray-500">Try browsing design trends to find related items</p>
         </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        
       </main>
     </div>
   );

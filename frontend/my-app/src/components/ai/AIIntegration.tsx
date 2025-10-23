@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { apiService, RoomAnalysisResult } from '@/services/api';
+import { AIService, UserSessionService } from '@/services/database';
+import { SessionData, InputType, RoomAnalysis } from '@/types/database';
 
 interface AIAnalysisProps {
   userId: string;

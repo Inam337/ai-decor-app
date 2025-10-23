@@ -75,27 +75,7 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <Link href="/" className="flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900">Art.Decor.AI</h1>
-            </Link>
-            <nav className="hidden md:flex space-x-8">
-              <Link href="/explore" className="text-gray-600 hover:text-gray-900">Explore</Link>
-              <Link href="/trending" className="text-gray-600 hover:text-gray-900">Trending</Link>
-              <Link href="/about" className="text-purple-600 font-semibold">About</Link>
-              <Link href="/upload-manager" className="text-gray-600 hover:text-gray-900">Upload</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-gray-50 pt-20">
       <main>
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 py-20">

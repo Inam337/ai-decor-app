@@ -54,7 +54,7 @@ def require_auth():
     """
     Dependency that requires authentication
     """
-    return Depends(get_current_user)
+    return get_current_user
 
 def optional_auth():
     """

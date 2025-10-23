@@ -3,13 +3,11 @@
 import { useState } from 'react';
 import Link from "next/link";
 import { useChatAI } from '@/components/ai/AIIntegration';
-import { UserSessionService } from '@/services/database';
-import { UserSession, SessionData, InputType } from '@/types/database';
 
 export default function ChatPage() {
   // Mock user ID - in real app, get from auth context
   const userId = 'user-123';
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionId] = useState<string | null>(null);
   
   const [messages, setMessages] = useState<Array<{
     id: string;
@@ -42,23 +40,33 @@ export default function ChatPage() {
   ]);
   const [inputValue, setInputValue] = useState('');
 
+  // Initialize the chat AI hook at component level
+  const { processMessage, isProcessing } = useChatAI({
+    userId,
+    onResponse: (response) => {
+      // Add AI response to messages
+      const aiMessage = {
+        id: `ai-${Date.now()}`,
+        session_id: currentSessionId || 'temp',
+        sender: 'bot' as const,
+        message: response,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    }
+  });
+
+  // Handle quick action clicks
+  const handleQuickAction = (message: string) => {
+    setInputValue(message);
+    // Trigger send immediately
+    setTimeout(() => {
+      handleSendMessage();
+    }, 0);
+  };
+
   const handleSendMessage = async () => {
     if (inputValue.trim()) {
-      const { processMessage, isProcessing } = useChatAI({
-        userId,
-        onResponse: (response) => {
-          // Add AI response to messages
-          const aiMessage = {
-            id: `ai-${Date.now()}`,
-            session_id: currentSessionId || 'temp',
-            sender: 'bot' as const,
-            message: response,
-            timestamp: new Date().toISOString()
-          };
-          setMessages(prev => [...prev, aiMessage]);
-        }
-      });
-
       // Add user message
       const userMessage = {
         id: `user-${Date.now()}`,
@@ -82,121 +90,112 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 pt-20">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Chat Interface */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-6">
-                <h2 className="text-2xl font-bold text-white">Chat with Your AI Stylist</h2>
-              </div>
-              
-              <div className="h-96 overflow-y-auto p-6 space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {message.sender === 'bot' && (
-                      <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                        <span className="text-white text-sm font-bold">AI</span>
-                      </div>
-                    )}
-                    
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                        message.sender === 'user'
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      <p className="text-sm">{message.message}</p>
-                    </div>
-                    
-                    {message.sender === 'user' && (
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center ml-3 flex-shrink-0">
-                        <span className="text-white text-sm font-bold">You</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="p-6 border-t border-gray-200">
-                <div className="flex">
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Ask about styles, colors, prices..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-r-lg hover:opacity-90 transition-opacity"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white">
+      <main className="max-w-4xl mx-auto px-6 py-16 pt-20">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-slate-900 mb-4">AI Design Assistant</h1>
+          <p className="text-lg text-slate-600">Get personalized design advice and recommendations</p>
+        </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg p-6 sticky top-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Chat Interface</h3>
-              <p className="text-gray-600 mb-4">Conversational AI assistant</p>
-              <div className="text-sm text-gray-500 mb-6">
-                Screen 6 of 6
-              </div>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <h4 className="font-semibold text-purple-900 mb-2">AI Capabilities</h4>
-                  <ul className="text-sm text-purple-700 space-y-1">
-                    <li>• Style recommendations</li>
-                    <li>• Color matching</li>
-                    <li>• Budget planning</li>
-                    <li>• Room analysis</li>
-                  </ul>
-                </div>
-                
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">Quick Actions</h4>
-                  <div className="space-y-2">
-                    <button className="w-full text-left text-sm text-blue-700 hover:text-blue-900">
-                      Show me abstract art
-                    </button>
-                    <button className="w-full text-left text-sm text-blue-700 hover:text-blue-900">
-                      What's trending?
-                    </button>
-                    <button className="w-full text-left text-sm text-blue-700 hover:text-blue-900">
-                      Find stores near me
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h4 className="font-semibold text-green-900 mb-2">Session Summary</h4>
-                  <p className="text-sm text-green-700">
-                    Analyzed room, discussed budget, found 5 recommendations
-                  </p>
-                </div>
-              </div>
-              
-              <Link 
-                href="/recommendations"
-                className="mt-6 w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity text-center block"
+        {/* Chat Container */}
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-lg overflow-hidden">
+          {/* Chat Messages */}
+          <div className="h-96 overflow-y-auto p-8 space-y-6">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                View Recommendations →
-              </Link>
+                <div className={`max-w-md px-6 py-4 rounded-2xl ${
+                  message.sender === 'user'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-50 text-slate-900'
+                }`}>
+                  <p className="text-sm leading-relaxed">{message.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Input Area */}
+          <div className="p-6 border-t border-slate-200 bg-slate-50">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about styles, colors, prices..."
+                disabled={isProcessing}
+                className="flex-1 px-4 py-3 bg-white border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={isProcessing || !inputValue.trim()}
+                className="px-6 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-slate-600 mb-4">Quick suggestions:</p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <button 
+              onClick={() => handleQuickAction("Show me abstract art")}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Show me abstract art
+            </button>
+            <button 
+              onClick={() => handleQuickAction("What's trending?")}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-purple-50 text-purple-700 rounded-full text-sm hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              What&apos;s trending?
+            </button>
+            <button 
+              onClick={() => handleQuickAction("Find stores near me")}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Find stores near me
+            </button>
+            <button 
+              onClick={() => handleQuickAction("Budget under $200")}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm hover:bg-orange-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Budget under $200
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="mt-12 text-center">
+          <Link 
+            href="/recommendations"
+            className="inline-flex items-center px-6 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors"
+          >
+            View Recommendations
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </main>
     </div>

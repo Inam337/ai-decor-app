@@ -1,11 +1,18 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Link from "next/link";
-import { apiService } from '@/services/api';
+import Link from 'next/link';
 import Footer from '@/components/Footer';
+import ProgressSteps from '@/components/analysis/ProgressSteps';
+import ImageUpload from '@/components/analysis/ImageUpload';
+import StyleInput from '@/components/analysis/StyleInput';
+import ProcessingStep from '@/components/analysis/ProcessingStep';
+import AnalysisResults from '@/components/analysis/AnalysisResults';
+import BackButton from '@/components/analysis/BackButton';
+import ContextIndicator from '@/components/analysis/ContextIndicator';
 
 export default function Home() {
+  const [showDemo, setShowDemo] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -29,23 +36,23 @@ export default function Home() {
     description: string;
   }>>([]);
   const [showResults, setShowResults] = useState(false);
+  const [contextUsed, setContextUsed] = useState(false);
+  const [contextSummary, setContextSummary] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setUploadedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-      setCurrentStep(2); // Move to input options step
-    }
+  const handleImageUpload = (file: File) => {
+    setUploadedImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    setCurrentStep(2); // Move to input options step
   };
+
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -65,10 +72,6 @@ export default function Home() {
     event.preventDefault();
   };
 
-  const handleOptionClick = (option: string) => {
-    setSelectedOption(option);
-    // No need to change step, we'll show both options together
-  };
 
   const prevStep = () => {
     if (currentStep > 1) {
@@ -85,6 +88,18 @@ export default function Home() {
     setAnalysisResult(null);
     setRecommendations([]);
     setShowResults(false);
+    setContextUsed(false);
+    setContextSummary(null);
+  };
+
+  const startDemo = () => {
+    setShowDemo(true);
+    resetFlow();
+  };
+
+  const exitDemo = () => {
+    setShowDemo(false);
+    resetFlow();
   };
 
   const processTextInput = async () => {
@@ -121,6 +136,13 @@ export default function Home() {
       };
       
       setAnalysisResult(mockAnalysisResult);
+      
+      // Simulate context usage for demo purposes
+      // In a real app, this would come from the API response
+      if (Math.random() > 0.5) { // 50% chance to show context
+        setContextUsed(true);
+        setContextSummary("Your last text query was: 'modern living room decor' | Search context from December 15, 2024 at 2:30 PM | Previous style preferences: modern, minimalist");
+      }
       
       // Mock recommendations based on analysis
       const mockRecommendations = [
@@ -249,7 +271,7 @@ export default function Home() {
       // Convert audio to base64 for API
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
+        // const base64Audio = reader.result as string;
         
         // Simulate progress updates
         const progressInterval = setInterval(() => {
@@ -277,6 +299,12 @@ export default function Home() {
         };
         
         setAnalysisResult(mockAnalysisResult);
+        
+        // Simulate context usage for voice queries
+        if (Math.random() > 0.3) { // 70% chance to show context for voice
+          setContextUsed(true);
+          setContextSummary("Your last voice query was: 'I need colorful artwork for my bedroom' | Search context from December 15, 2024 at 3:45 PM | Previous style preferences: contemporary, vibrant");
+        }
         
         // Mock recommendations based on voice analysis
         const mockRecommendations = [
@@ -320,372 +348,415 @@ export default function Home() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-16 pt-20">
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center space-x-2">
-            {[1, 2, 3, 4].map((step) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs transition-all ${
-                  step === currentStep 
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg' 
-                    : step < currentStep 
-                      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                      : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {step < currentStep ? '✓' : step}
-                </div>
-                {step < 4 && (
-                  <div className={`w-12 h-1 mx-1 rounded ${
-                    step < currentStep 
-                      ? 'bg-gradient-to-r from-green-500 to-green-600' 
-                      : 'bg-gray-200'
-                  }`} />
-                )}
+  // Step configuration
+  const stepTitles = [
+    'Step 1: Upload Your Space',
+    'Step 2: Describe Your Style',
+    'Step 3: AI Analysis',
+    'Step 4: Your Results'
+  ];
+
+  const stepDescriptions = [
+    'Upload a photo of your space to get started',
+    'Tell us about your design preferences or record your voice',
+    'Our AI is analyzing your image and preferences',
+    'Your personalized analysis and recommendations are ready'
+  ];
+
+  // If demo is active, show the interactive demo
+  if (showDemo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
+        {/* Demo Header */}
+        <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">AI</span>
               </div>
-            ))}
-          </div>
-          <div className="text-center mt-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {currentStep === 1 && 'Step 1: Upload Your Space'}
-              {currentStep === 2 && 'Step 2: Describe Your Style'}
-              {currentStep === 3 && 'Step 3: AI Analysis'}
-              {currentStep === 4 && 'Step 4: Your Results'}
-            </h2>
-            <p className="text-gray-600">
-              {currentStep === 1 && 'Upload a photo of your space to get started'}
-              {currentStep === 2 && 'Tell us about your design preferences or record your voice'}
-              {currentStep === 3 && 'Our AI is analyzing your image and preferences'}
-              {currentStep === 4 && 'Your personalized analysis and recommendations are ready'}
-            </p>
+              <h1 className="text-xl font-bold text-gray-900">Art.Decor.AI Demo</h1>
+            </div>
+            <button
+              onClick={exitDemo}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Exit Demo
+            </button>
           </div>
         </div>
 
-        {/* Step Content */}
-        <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-8 min-h-[500px] relative">
+        {/* Main Demo Content */}
+        <main className="max-w-4xl mx-auto px-4 py-16">
+          {/* Progress Steps */}
+          <ProgressSteps
+            currentStep={currentStep}
+            totalSteps={4}
+            stepTitles={stepTitles}
+            stepDescriptions={stepDescriptions}
+          />
+
+          {/* Step Content */}
+          <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-8 min-h-[500px] relative">
+            
+            {/* Context Indicator */}
+            <ContextIndicator 
+              contextUsed={contextUsed}
+              contextSummary={contextSummary || undefined}
+              onClearContext={() => {
+                setContextUsed(false);
+                setContextSummary(null);
+              }}
+            />
+            
+            {/* Back Button - Top Left */}
+            {currentStep > 1 && (
+              <BackButton onBack={prevStep} />
+            )}
+            
+            {/* Step 1: Upload Image */}
+            {currentStep === 1 && (
+              <ImageUpload
+                onImageUpload={handleImageUpload}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                fileInputRef={fileInputRef}
+              />
+            )}
+
+            {/* Step 2: Input Options */}
+            {currentStep === 2 && (
+              <StyleInput
+                textDescription={textDescription}
+                onTextChange={setTextDescription}
+                imagePreview={imagePreview}
+                isRecording={isRecording}
+                isProcessing={isProcessing}
+                selectedOption={selectedOption}
+                onStartRecording={startRecording}
+                onStopRecording={stopRecording}
+                onProcessAnalysis={() => {
+                  if (textDescription.trim()) {
+                    processTextInput();
+                  } else if (selectedOption === 'voice') {
+                    setCurrentStep(3);
+                  } else {
+                    alert('Please describe your style or record your voice before proceeding.');
+                  }
+                }}
+              />
+            )}
+
+            {/* Step 3: Processing */}
+            {currentStep === 3 && (
+              <ProcessingStep processingProgress={processingProgress} />
+            )}
+
+            {/* Step 4: Results */}
+            {currentStep === 4 && showResults && analysisResult && (
+              <AnalysisResults
+                analysisResult={analysisResult}
+                recommendations={recommendations}
+                onResetFlow={resetFlow}
+              />
+            )}
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
+  // Main homepage content
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)]"></div>
+        <div className="relative max-w-6xl mx-auto px-6 py-24 text-center">
+          <div className="max-w-4xl mx-auto">
+            <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium mb-8">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              AI-Powered Interior Design
+            </div>
+            <h1 className="text-6xl md:text-7xl font-bold text-slate-900 mb-8 leading-tight">
+              Find Your Perfect
+              <span className="block bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                Artwork Match
+              </span>
+            </h1>
+            <p className="text-xl text-slate-600 mb-12 max-w-2xl mx-auto leading-relaxed">
+              Upload a photo of your space and get instant AI-powered artwork recommendations that perfectly match your style.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={startDemo}
+                className="px-8 py-4 bg-slate-900 text-white font-semibold rounded-2xl hover:bg-slate-800 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              >
+                Try Demo
+              </button>
+              <Link
+                href="/dashboard"
+                className="px-8 py-4 bg-white text-slate-900 font-semibold rounded-2xl hover:bg-slate-50 transition-all duration-300 border border-slate-200 shadow-sm"
+              >
+                View Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Simple Process Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">How It Works</h2>
+            <p className="text-lg text-slate-600">Simple steps to perfect artwork</p>
+          </div>
           
-          {/* Back Button - Top Left */}
-          {currentStep > 1 && (
-            <button
-              onClick={prevStep}
-              className="absolute top-6 left-6 bg-gradient-to-r from-gray-400 to-gray-500 text-white px-4 py-2 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all flex items-center space-x-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-              <span>Back</span>
-            </button>
-          )}
-          
-          {/* Step 1: Upload Image */}
-          {currentStep === 1 && (
-            <div className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="text-center group">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Space</h3>
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                Upload a photo of your space to get started with AI analysis
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">Upload Photo</h3>
+              <p className="text-slate-600">Take a photo of your room or upload an existing image</p>
+            </div>
+            
+            <div className="text-center group">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">Describe Style</h3>
+              <p className="text-slate-600">Tell us your preferences via text or voice</p>
+            </div>
+            
+            <div className="text-center group">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">Get Results</h3>
+              <p className="text-slate-600">Receive personalized artwork recommendations</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Context Storage Feature */}
+      <section className="py-24 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
+                Smart Learning
+              </div>
+              <h2 className="text-4xl font-bold text-slate-900 mb-6">Your Searches Get Smarter</h2>
+              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+                Every search builds on your previous preferences, creating increasingly personalized recommendations without you having to repeat yourself.
               </p>
               
-              <div className="max-w-2xl mx-auto">
-                <div
-                  className="border-3 border-dashed border-gray-300 rounded-3xl p-12 text-center transition-all duration-300 hover:border-green-400 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                >
-                  <div className="space-y-6">
-                    <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto">
-                      <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 font-medium text-lg mb-2">Drop your room photo here</p>
-                      <p className="text-gray-500 mb-6">or click to browse</p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg hover:shadow-xl"
-                      >
-                        Choose Image
-                      </button>
-                    </div>
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Input Options */}
-          {currentStep === 2 && (
-            <div className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Describe Your Style</h3>
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                Tell us about your design preferences or record your voice
-              </p>
-              
-              {/* Show uploaded image preview */}
-              {imagePreview && (
-                <div className="mb-8">
-                  <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden shadow-lg">
-                    <img src={imagePreview} alt="Uploaded space" className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">Your uploaded space</p>
-                </div>
-              )}
-              
-              <div className="max-w-4xl mx-auto space-y-8">
-                {/* Text Input Section */}
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6">
-                  <div className="flex items-center justify-center mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mr-3">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                    </div>
-                    <h4 className="text-lg font-semibold text-gray-900">Describe Style</h4>
-                  </div>
-                  <textarea
-                    value={textDescription}
-                    onChange={(e) => setTextDescription(e.target.value)}
-                    placeholder="Tell us about your style preferences... e.g., 'I love modern minimalist design with clean lines and neutral colors. I want something that complements my white walls and wooden furniture.'"
-                    className="w-full h-32 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg resize-none"
-                  />
-                  <div className="flex justify-between items-center mt-4">
-                    <p className="text-sm text-gray-500">
-                      {textDescription.length}/500 characters
-                    </p>
-                  </div>
-                </div>
-
-                {/* Voice Recording Section */}
-                <div className="bg-gradient-to-br from-pink-50 to-red-50 rounded-2xl p-6">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-500 rounded-full flex items-center justify-center mr-3">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                      </svg>
-                    </div>
-                    <h4 className="text-lg font-semibold text-gray-900">Voice Recording</h4>
-                  </div>
-                  
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                      isRecording ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-red-500'
-                    }`}>
-                      <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                      </svg>
-                    </div>
-                   
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={isProcessing}
-                      className={`px-8 py-4 rounded-2xl font-semibold text-lg transition-all ${
-                        isRecording 
-                          ? 'bg-red-500 hover:bg-red-600 text-white' 
-                          : 'bg-gradient-to-r from-pink-500 to-red-500 hover:opacity-90 text-white'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {isRecording ? 'Stop Recording' : 'Start Recording'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Process Analysis Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => {
-                      if (textDescription.trim()) {
-                        processTextInput();
-                      } else if (selectedOption === 'voice') {
-                        // If voice was used, the processVoiceInput is already called in the recording flow
-                        setCurrentStep(3);
-                      } else {
-                        alert('Please describe your style or record your voice before proceeding.');
-                      }
-                    }}
-                    disabled={!textDescription.trim() && !selectedOption}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                  >
-                    Process Analysis
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Processing */}
-          {currentStep === 3 && (
-            <div className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis in Progress</h3>
-              <p className="text-gray-600 mb-8">Our AI is analyzing your image and preferences</p>
-              
-              <div className="max-w-md mx-auto">
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 font-medium">Progress</span>
-                    <span className="text-purple-600 font-bold text-lg">{Math.round(processingProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div 
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 h-4 rounded-full transition-all duration-500"
-                      style={{ width: `${processingProgress}%` }}
-                    ></div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">Automatic Learning</h3>
+                    <p className="text-slate-600">System learns your style preferences from each search</p>
                   </div>
                 </div>
                 
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6">
-                  <p className="text-gray-700 font-medium">
-                    {processingProgress < 25 && "Processing image..."}
-                    {processingProgress >= 25 && processingProgress < 50 && "Detecting objects..."}
-                    {processingProgress >= 50 && processingProgress < 75 && "Analyzing color palette..."}
-                    {processingProgress >= 75 && processingProgress < 100 && "Generating recommendations..."}
-                    {processingProgress === 100 && "Analysis complete!"}
-                  </p>
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">Better Results</h3>
+                    <p className="text-slate-600">Each recommendation becomes more accurate over time</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">Seamless Experience</h3>
+                    <p className="text-slate-600">No need to repeat preferences - we remember everything</p>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Step 4: Results */}
-          {currentStep === 4 && showResults && analysisResult && (
-            <div className="text-center">
-              <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Analysis Complete!</h3>
-              <p className="text-gray-600 mb-8">Your personalized analysis and recommendations are ready</p>
-
-              <div className="max-w-4xl mx-auto space-y-8">
-                {/* Image Analysis Results */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Color Palette */}
-                  <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
-                    <h4 className="text-xl font-bold text-gray-900 mb-4">Color Palette</h4>
-                    <div className="flex justify-center space-x-3 mb-4">
-                      {analysisResult.colorPalette.map((color: string, index: number) => (
-                        <div
-                          key={index}
-                          className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg"
-                          style={{ backgroundColor: color }}
-                          title={color}
-                        ></div>
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600">Detected from your space</p>
+            
+            <div className="bg-white rounded-3xl p-8 shadow-xl">
+              <div className="space-y-6">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
+                    <span className="text-white font-bold">1</span>
                   </div>
-
-                  {/* Detected Objects */}
-                  <div className="bg-gradient-to-br from-white/80 to-white/60 backdrop-blur-sm rounded-3xl shadow-xl p-6">
-                    <h4 className="text-xl font-bold text-gray-900 mb-4">Detected Objects</h4>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {analysisResult.detectedObjects.map((object: string, index: number) => (
-                        <span key={index} className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                          {object}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-3">Found in your space</p>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">First Search</h3>
+                    <p className="text-slate-600 text-sm">&quot;Modern living room art&quot;</p>
                   </div>
                 </div>
-
-                {/* Style Analysis */}
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Detected Style</p>
-                      <p className="font-bold text-gray-900 text-xl capitalize">{analysisResult.style}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Confidence</p>
-                      <p className="font-bold text-green-600 text-xl">{(analysisResult.confidence * 100).toFixed(0)}%</p>
-                    </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                    <span className="text-white font-bold">2</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">System Learns</h3>
+                    <p className="text-slate-600 text-sm">Modern style preference saved</p>
                   </div>
                 </div>
-
-                {/* Recommendations */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {recommendations.map((rec) => (
-                    <div key={rec.id} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 hover:shadow-lg transition-all">
-                      <img 
-                        src={rec.image_url} 
-                        alt={rec.title}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
-                      />
-                      <h4 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h4>
-                      <p className="text-gray-600 text-sm mb-3">{rec.description}</p>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {rec.style_tags.map((tag: string, index: number) => (
-                          <span key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xl font-bold text-gray-900">${rec.price}</span>
-                        <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                    <span className="text-white font-bold">3</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Next Search</h3>
+                    <p className="text-slate-600 text-sm">&quot;Bedroom decor&quot; → automatically includes modern style</p>
+                  </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="space-y-4">
-                  <Link
-                    href="/recommendations"
-                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-2xl font-semibold text-lg hover:from-purple-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl block"
-                  >
-                    View All Recommendations
-                  </Link>
-                  <Link
-                    href="/chat"
-                    className="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white py-3 rounded-xl font-semibold hover:from-gray-500 hover:to-gray-600 transition-all block"
-                  >
-                    Chat with AI
-                  </Link>
-                </div>
-
-                {/* Navigation */}
-                <div className="flex justify-center mt-8">
-                  <button
-                    onClick={resetFlow}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all"
-                  >
-                    Start Over
-                  </button>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Perfect Match</h3>
+                    <p className="text-slate-600 text-sm">More relevant recommendations</p>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
           </div>
-      </main>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">Everything You Need</h2>
+            <p className="text-lg text-slate-600">Complete toolkit for interior design</p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Link href="/dashboard" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-blue-300">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Dashboard</h3>
+                <p className="text-slate-600 text-sm">System overview and analytics</p>
+              </div>
+            </Link>
+
+            <Link href="/upload-manager" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-green-300">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Upload Manager</h3>
+                <p className="text-slate-600 text-sm">Advanced file management</p>
+              </div>
+            </Link>
+
+            <Link href="/recommendations" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-orange-300">
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
+                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Recommendations</h3>
+                <p className="text-slate-600 text-sm">Personalized suggestions</p>
+              </div>
+            </Link>
+
+            <Link href="/chat" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-purple-300">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-200 transition-colors">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">AI Chat</h3>
+                <p className="text-slate-600 text-sm">Real-time design advice</p>
+              </div>
+            </Link>
+
+            <Link href="/stores" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-yellow-300">
+                <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-yellow-200 transition-colors">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Local Stores</h3>
+                <p className="text-slate-600 text-sm">Find nearby retailers</p>
+              </div>
+            </Link>
+
+            <Link href="/trending" className="group">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 group-hover:border-pink-300">
+                <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-pink-200 transition-colors">
+                  <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Trending Styles</h3>
+                <p className="text-slate-600 text-sm">Current design trends</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      <section className="py-24 bg-slate-900">
+        <div className="max-w-4xl mx-auto text-center px-6">
+          <h2 className="text-4xl font-bold text-white mb-6">Ready to Get Started?</h2>
+          <p className="text-xl text-slate-300 mb-12">
+            Join thousands of users discovering their perfect artwork with AI-powered recommendations
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={startDemo}
+              className="px-8 py-4 bg-white text-slate-900 font-semibold rounded-2xl hover:bg-slate-100 transition-all duration-300 transform hover:scale-105"
+            >
+              Try Demo Now
+            </button>
+            <Link
+              href="/auth"
+              className="px-8 py-4 bg-transparent text-white font-semibold rounded-2xl hover:bg-slate-800 transition-all duration-300 border border-slate-700"
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>

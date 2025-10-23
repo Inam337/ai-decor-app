@@ -85,14 +85,23 @@ class DecisionRouter:
             }
     
     async def process_text_query(self, query: str, user_id: str, location: str = None) -> Dict:
-        """Process text-based queries"""
+        """Process text-based queries with context awareness"""
         try:
             # Get user preferences
             user_profile = await self.supabase_client.get_user_profile(user_id)
             user_preferences = user_profile.get("preferences", {}) if user_profile else {}
             
+            # Get previous search context
+            previous_context = await self.supabase_client.get_search_context(user_id)
+            
             # Parse query for style preferences
             parsed_query = self._parse_text_query(query)
+            
+            # Enhance query with context if available
+            if previous_context:
+                context_data = previous_context.get("context_data", {})
+                parsed_query = self._enhance_query_with_context(parsed_query, context_data, query)
+                logger.info(f"Enhanced query with context for user {user_id}")
             
             # Get recommendations based on text description
             recommendations = self.artwork_retrieval.get_personalized_recommendations(
@@ -111,8 +120,22 @@ class DecisionRouter:
             
             # Generate reasoning
             final_reasoning = self._generate_text_query_reasoning(
-                query, recommendations, trend_insights, user_preferences
+                query, recommendations, trend_insights, user_preferences, previous_context
             )
+            
+            # Save current search context for future reference
+            current_context = {
+                "query": query,
+                "parsed_query": parsed_query,
+                "location": location,
+                "recommendations": recommendations,
+                "trend_insights": trend_insights,
+                "location_suggestions": location_suggestions,
+                "final_reasoning": final_reasoning,
+                "query_type": "text",
+                "timestamp": datetime.now().isoformat()
+            }
+            await self.supabase_client.save_search_context(user_id, current_context)
             
             return {
                 "success": True,
@@ -121,7 +144,9 @@ class DecisionRouter:
                 "recommendations": recommendations,
                 "trend_insights": trend_insights,
                 "location_suggestions": location_suggestions,
-                "final_reasoning": final_reasoning
+                "final_reasoning": final_reasoning,
+                "context_used": previous_context is not None,
+                "context_summary": self._get_context_summary(previous_context) if previous_context else None
             }
             
         except Exception as e:
@@ -134,15 +159,75 @@ class DecisionRouter:
                 "location_suggestions": {}
             }
     
-    async def process_voice_query(self, audio_path: str, user_id: str, location: str = None) -> Dict:
-        """Process voice queries (simplified - would use Whisper for transcription)"""
+    async def process_voice_query(self, audio_data: str, user_id: str, location: str = None) -> Dict:
+        """Process voice queries with context awareness"""
         try:
             # In a real implementation, this would use Whisper to transcribe audio
             # For now, we'll simulate a transcribed query
             transcribed_query = "I need modern wall art for my living room"
             
-            # Process as text query
-            return await self.process_text_query(transcribed_query, user_id, location)
+            # Get user preferences
+            user_profile = await self.supabase_client.get_user_profile(user_id)
+            user_preferences = user_profile.get("preferences", {}) if user_profile else {}
+            
+            # Get previous search context
+            previous_context = await self.supabase_client.get_search_context(user_id)
+            
+            # Parse query for style preferences
+            parsed_query = self._parse_text_query(transcribed_query)
+            
+            # Enhance query with context if available
+            if previous_context:
+                context_data = previous_context.get("context_data", {})
+                parsed_query = self._enhance_query_with_context(parsed_query, context_data, transcribed_query)
+                logger.info(f"Enhanced voice query with context for user {user_id}")
+            
+            # Get recommendations based on transcribed query
+            recommendations = self.artwork_retrieval.get_personalized_recommendations(
+                parsed_query, user_preferences, k=5
+            )
+            
+            # Get trend insights
+            trend_insights = await self.trend_agent.analyze_style_evolution(user_preferences)
+            
+            # Get location suggestions
+            location_suggestions = {}
+            if location:
+                location_suggestions = self.geo_agent.get_location_based_recommendations(
+                    location, user_preferences
+                )
+            
+            # Generate reasoning
+            final_reasoning = self._generate_text_query_reasoning(
+                transcribed_query, recommendations, trend_insights, user_preferences, previous_context
+            )
+            
+            # Save current search context for future reference
+            current_context = {
+                "query": transcribed_query,
+                "parsed_query": parsed_query,
+                "location": location,
+                "recommendations": recommendations,
+                "trend_insights": trend_insights,
+                "location_suggestions": location_suggestions,
+                "final_reasoning": final_reasoning,
+                "query_type": "voice",
+                "audio_data": audio_data[:100] + "..." if len(audio_data) > 100 else audio_data,  # Store truncated audio for reference
+                "timestamp": datetime.now().isoformat()
+            }
+            await self.supabase_client.save_search_context(user_id, current_context)
+            
+            return {
+                "success": True,
+                "transcribed_query": transcribed_query,
+                "parsed_query": parsed_query,
+                "recommendations": recommendations,
+                "trend_insights": trend_insights,
+                "location_suggestions": location_suggestions,
+                "final_reasoning": final_reasoning,
+                "context_used": previous_context is not None,
+                "context_summary": self._get_context_summary(previous_context) if previous_context else None
+            }
             
         except Exception as e:
             logger.error(f"Error processing voice query: {e}")
@@ -257,13 +342,113 @@ class DecisionRouter:
             logger.error(f"Error generating final reasoning: {e}")
             return "We've provided personalized recommendations based on your space analysis."
     
+    def _enhance_query_with_context(self, parsed_query: Dict, context_data: Dict, current_query: str) -> Dict:
+        """Enhance current query with information from previous context"""
+        try:
+            enhanced_query = parsed_query.copy()
+            
+            # Get previous query information
+            previous_query = context_data.get("query", "")
+            previous_parsed = context_data.get("parsed_query", {})
+            previous_recommendations = context_data.get("recommendations", [])
+            
+            # Enhance detected styles with previous preferences
+            if previous_parsed.get("detected_styles"):
+                current_styles = enhanced_query.get("detected_styles", [])
+                previous_styles = previous_parsed.get("detected_styles", [])
+                
+                # Merge styles, giving priority to current query but including relevant previous styles
+                all_styles = list(set(current_styles + previous_styles))
+                enhanced_query["detected_styles"] = all_styles
+            
+            # Enhance color preferences
+            if previous_parsed.get("detected_colors"):
+                current_colors = enhanced_query.get("detected_colors", [])
+                previous_colors = previous_parsed.get("detected_colors", [])
+                
+                all_colors = list(set(current_colors + previous_colors))
+                enhanced_query["detected_colors"] = all_colors
+            
+            # Add context information
+            enhanced_query["context_enhanced"] = True
+            enhanced_query["previous_query"] = previous_query
+            enhanced_query["context_timestamp"] = context_data.get("timestamp", "")
+            
+            # If current query is vague, use more context
+            if len(current_query.split()) < 3:  # Very short query
+                enhanced_query["detected_room"] = previous_parsed.get("detected_room", enhanced_query.get("detected_room", "living_room"))
+                if not enhanced_query.get("detected_styles"):
+                    enhanced_query["detected_styles"] = previous_parsed.get("detected_styles", ["modern"])
+            
+            return enhanced_query
+            
+        except Exception as e:
+            logger.error(f"Error enhancing query with context: {e}")
+            return parsed_query
+    
+    def _get_context_summary(self, context: Dict) -> str:
+        """Generate a summary of the previous context for user reference"""
+        try:
+            if not context:
+                return None
+            
+            context_data = context.get("context_data", {})
+            previous_query = context_data.get("query", "")
+            query_type = context_data.get("query_type", "text")
+            timestamp = context_data.get("timestamp", "")
+            
+            # Format timestamp for display
+            if timestamp:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    formatted_time = dt.strftime("%B %d, %Y at %I:%M %p")
+                except:
+                    formatted_time = "recently"
+            else:
+                formatted_time = "recently"
+            
+            summary_parts = []
+            
+            if previous_query:
+                summary_parts.append(f"Your last {query_type} query was: '{previous_query}'")
+            
+            summary_parts.append(f"Search context from {formatted_time}")
+            
+            # Add style information if available
+            parsed_query = context_data.get("parsed_query", {})
+            if parsed_query.get("detected_styles"):
+                styles = ", ".join(parsed_query["detected_styles"])
+                summary_parts.append(f"Previous style preferences: {styles}")
+            
+            return " | ".join(summary_parts)
+            
+        except Exception as e:
+            logger.error(f"Error generating context summary: {e}")
+            return "Previous search context available"
+    
     def _generate_text_query_reasoning(self, query: str, recommendations: List[Dict], 
-                                     trend_insights: Dict, user_preferences: Dict) -> str:
-        """Generate reasoning for text query results"""
+                                     trend_insights: Dict, user_preferences: Dict, previous_context: Dict = None) -> str:
+        """Generate reasoning for text query results with context awareness"""
         try:
             reasoning_parts = []
             
+            # Base reasoning
             reasoning_parts.append(f"Based on your request: '{query}', we've curated recommendations that match your described preferences.")
+            
+            # Add context-aware reasoning
+            if previous_context:
+                context_data = previous_context.get("context_data", {})
+                previous_query = context_data.get("query", "")
+                
+                if previous_query and previous_query != query:
+                    reasoning_parts.append(f"Building on your previous search for '{previous_query}', I've refined these recommendations to better match your evolving preferences.")
+                
+                # Add style continuity reasoning
+                parsed_query = context_data.get("parsed_query", {})
+                if parsed_query.get("detected_styles"):
+                    styles = ", ".join(parsed_query["detected_styles"])
+                    reasoning_parts.append(f"Maintaining consistency with your preferred {styles} style.")
             
             if recommendations:
                 top_recommendation = recommendations[0]

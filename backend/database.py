@@ -75,9 +75,9 @@ class SupabaseClient:
             return None
     
     async def save_session(self, session_data: dict):
-        """Mock save a user session"""
+        """Mock save a user session with enhanced context storage"""
         try:
-            logger.info("Mock saving user session")
+            logger.info("Mock saving user session with context")
             
             session = {
                 "id": f"session_{len(self.mock_data['user_sessions']) + 1}",
@@ -90,6 +90,92 @@ class SupabaseClient:
             
         except Exception as e:
             logger.error(f"Error saving session: {e}")
+            return None
+    
+    async def save_search_context(self, user_id: str, context_data: dict):
+        """Save search context for future reference"""
+        try:
+            logger.info(f"Mock saving search context for user {user_id}")
+            
+            context = {
+                "id": f"context_{len(self.mock_data.get('search_contexts', [])) + 1}",
+                "user_id": user_id,
+                "context_data": context_data,
+                "created_at": datetime.now().isoformat(),
+                "last_accessed": datetime.now().isoformat()
+            }
+            
+            if "search_contexts" not in self.mock_data:
+                self.mock_data["search_contexts"] = []
+            
+            # Remove old context for this user if exists
+            self.mock_data["search_contexts"] = [
+                ctx for ctx in self.mock_data["search_contexts"] 
+                if ctx.get("user_id") != user_id
+            ]
+            
+            self.mock_data["search_contexts"].append(context)
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error saving search context: {e}")
+            return None
+    
+    async def get_search_context(self, user_id: str):
+        """Get the most recent search context for a user"""
+        try:
+            logger.info(f"Mock getting search context for user {user_id}")
+            
+            if "search_contexts" not in self.mock_data:
+                return None
+            
+            user_contexts = [
+                ctx for ctx in self.mock_data["search_contexts"]
+                if ctx.get("user_id") == user_id
+            ]
+            
+            if not user_contexts:
+                return None
+            
+            # Return the most recent context
+            latest_context = max(user_contexts, key=lambda x: x.get("created_at", ""))
+            
+            # Update last accessed time
+            latest_context["last_accessed"] = datetime.now().isoformat()
+            
+            return latest_context
+            
+        except Exception as e:
+            logger.error(f"Error getting search context: {e}")
+            return None
+    
+    async def update_search_context(self, user_id: str, additional_context: dict):
+        """Update existing search context with new information"""
+        try:
+            logger.info(f"Mock updating search context for user {user_id}")
+            
+            existing_context = await self.get_search_context(user_id)
+            if not existing_context:
+                return await self.save_search_context(user_id, additional_context)
+            
+            # Merge additional context with existing
+            merged_context = {
+                **existing_context["context_data"],
+                **additional_context,
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            # Update the context
+            for ctx in self.mock_data.get("search_contexts", []):
+                if ctx.get("user_id") == user_id:
+                    ctx["context_data"] = merged_context
+                    ctx["last_accessed"] = datetime.now().isoformat()
+                    break
+            
+            return existing_context
+            
+        except Exception as e:
+            logger.error(f"Error updating search context: {e}")
             return None
     
     async def get_user_sessions(self, user_id: str, limit: int = 10):
